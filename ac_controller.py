@@ -95,7 +95,7 @@ def init(api_key=None, qw_host=None, location=None, brand=None):
 
        Agent 可直接传入配置，无需手动编辑 config.json：
            init(api_key="xxx", qw_host="https://xxx.re.qweatherapi.com",
-                location={"lat": 23.03, "lon": 116.32, "name": "华湖镇"})
+                location={"lat": 22.54, "lon": 114.05, "name": "深圳"})
     """
     global config
     config = load_config()
