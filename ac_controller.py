@@ -592,7 +592,7 @@ class App(ctk.CTk):
     def _open_settings(self):
         dlg = Toplevel(self)
         dlg.title("⚙️ 设置")
-        dlg.geometry("480x460")
+        dlg.geometry("480x540")
         dlg.transient(self)
         dlg.grab_set()
 
