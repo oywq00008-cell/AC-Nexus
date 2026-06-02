@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-智能空调控制器 — macOS 桌面应用
+BroadlinkAC — 博联空调智能控制器 (macOS 桌面应用)
 customtkinter + 和风天气 + 中央气象台台风网 + Broadlink RM 系列
 """
 
@@ -26,7 +26,7 @@ import schedule as sch
 # ═══════════════════════════════════════════
 # 配置
 # ═══════════════════════════════════════════
-APP_NAME = "智能空调控制器"
+APP_NAME = "BroadlinkAC"
 APP_DIR = Path.home() / ".ac_controller"
 CONFIG_FILE = APP_DIR / "config.json"
 LOG_DIR = APP_DIR / "logs"
