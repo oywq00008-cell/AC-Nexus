@@ -21,7 +21,7 @@ macOS 桌面应用，通过 Broadlink RM4 Mini 红外遥控器控制空调，集
 
 ### 方式一：下载 .app（推荐）
 
-从 [Releases](https://github.com/xxx/ac-controller/releases) 下载 `智能空调.app`，拖到应用程序文件夹，双击运行。
+从 [Releases](https://github.com/oywq00008-cell/ac-controller/releases) 下载 `智能空调.app`，拖到应用程序文件夹，双击运行。
 
 首次启动如提示"无法验证开发者"：
 ```bash
@@ -31,7 +31,7 @@ xattr -cr /Applications/智能空调.app
 ### 方式二：从源码运行
 
 ```bash
-git clone https://github.com/xxx/ac-controller.git
+git clone https://github.com/oywq00008-cell/ac-controller.git
 cd ac-controller
 pip install -r requirements.txt
 python3 ac_controller.py
