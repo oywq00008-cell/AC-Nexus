@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 智能空调控制器 — macOS 桌面应用
-customtkinter + 和风天气 + 中央气象台台风网 + Broadlink RM4 Mini
+customtkinter + 和风天气 + 中央气象台台风网 + Broadlink RM 系列
 """
 
 import json
@@ -1226,18 +1226,19 @@ class App(ctk.CTk):
         cached = load_device_cache()
         ip = cached["host"] if cached else "未知"
         mac = cached["mac"] if cached else "未知"
+        model = cached.get("model", "Broadlink RM") if cached else "Broadlink RM"
         guide = (
             "🔧 博联设备排查指南\n\n"
-            "1. 确认 RM4 Mini 电源指示灯是否亮起\n"
+            "1. 确认设备电源指示灯是否亮起\n"
             "2. 确认设备已连接路由器 WiFi\n"
             "   （指示灯常亮 = 已连接）\n"
-            "3. 确认电脑与 RM4 Mini 在同一局域网\n"
-            "4. 尝试拔掉 RM4 Mini 电源，10 秒后重插\n"
+            "3. 确认电脑与设备在同一局域网\n"
+            "4. 尝试拔掉设备电源，10 秒后重插\n"
             "5. 如果路由器有 AP 隔离功能，请关闭\n"
             "6. 检查路由器管理页能否看到该设备\n"
             "\n"
             f"📟 已知设备信息:\n"
-            f"   型号: Broadlink RM4 Mini\n"
+            f"   型号: {model}\n"
             f"   上次 IP: {ip}\n"
             f"   MAC: {mac}\n"
             "\n"

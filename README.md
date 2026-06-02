@@ -14,7 +14,7 @@ macOS 桌面应用，通过 Broadlink RM4 Mini 红外遥控器控制空调，集
 ## 🧰 硬件要求
 
 - 一台 Mac（Apple Silicon / Intel）
-- [Broadlink RM4 Mini](https://www.broadlink.com.cn/) 红外遥控器
+- [Broadlink RM 系列](https://www.broadlink.com.cn/) 红外遥控器（RM Mini / RM Pro / RM4 Mini 等）
 - 空调（支持品牌见上）
 
 ## 🚀 快速开始
