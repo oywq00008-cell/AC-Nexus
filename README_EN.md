@@ -50,7 +50,7 @@ send_ac("off", "cool", 26, "auto")  # Turn off
 
 ### Option 1: Download .app (recommended)
 
-Download from [Releases](https://github.com/oywq00008-cell/BroadlinkAC/releases), double-click.
+Download from [Releases](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases), double-click.
 
 If Gatekeeper blocks it:
 ```bash
@@ -60,7 +60,7 @@ xattr -cr /Applications/BroadlinkAC.app
 ### Option 2: Run from source
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC.git
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
 cd BroadlinkAC
 pip install -r requirements.txt
 python3 ac_controller.py
@@ -69,7 +69,7 @@ python3 ac_controller.py
 ### Option 3: Agent auto control
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC.git
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
 cd BroadlinkAC
 pip install -r requirements.txt
 ```

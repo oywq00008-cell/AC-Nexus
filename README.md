@@ -50,7 +50,7 @@ send_ac("off", "cool", 26, "auto")  # 关机
 
 ### 方式一：下载 .app（推荐）
 
-从 [Releases](https://github.com/oywq00008-cell/BroadlinkAC/releases) 下载 `BroadlinkAC.app`，双击运行。
+从 [Releases](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases) 下载 `BroadlinkAC.app`，双击运行。
 
 首次提示「无法验证开发者」：
 ```bash
@@ -60,7 +60,7 @@ xattr -cr /Applications/BroadlinkAC.app
 ### 方式二：从源码运行
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC.git
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
 cd BroadlinkAC
 pip install -r requirements.txt
 python3 ac_controller.py
@@ -69,7 +69,7 @@ python3 ac_controller.py
 ### 方式三：Agent 全自动调用
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC.git
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
 cd BroadlinkAC
 pip install -r requirements.txt
 ```
