@@ -1,6 +1,7 @@
 """BroadlinkAC Desktop — macOS GUI"""
 
 import json
+import platform
 import sys
 import threading
 import urllib.request
@@ -31,8 +32,9 @@ from broadlinkac_core.scheduler import (
 )
 
 APP_NAME = "BroadlinkAC"
+IS_MAC = platform.system() == "Darwin"
 
-# ── 开机自启 (macOS LaunchAgent) ──
+# ── 开机自启 ──
 LAUNCH_AGENT = Path.home() / "Library/LaunchAgents/com.local.ac-controller.plist"
 
 
@@ -41,19 +43,36 @@ def check_autostart():
 
 
 def enable_autostart():
-    import plistlib
-    plist = {
-        "Label": "com.local.ac-controller",
-        "ProgramArguments": [sys.executable, str(Path(__file__).resolve().parent.parent / "ac_controller.py")],
-        "RunAtLoad": True,
-    }
-    LAUNCH_AGENT.parent.mkdir(parents=True, exist_ok=True)
-    plistlib.dump(plist, LAUNCH_AGENT.open("wb"))
+    if IS_MAC:
+        # macOS: LaunchAgent plist
+        import plistlib
+        plist = {
+            "Label": "com.local.ac-controller",
+            "ProgramArguments": [sys.executable, str(Path(__file__).resolve().parent.parent / "ac_controller.py")],
+            "RunAtLoad": True,
+        }
+        LAUNCH_AGENT.parent.mkdir(parents=True, exist_ok=True)
+        plistlib.dump(plist, LAUNCH_AGENT.open("wb"))
+    else:
+        # Windows: 注册表 Run 键
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(key, "BroadlinkAC", 0, winreg.REG_SZ, sys.executable)
 
 
 def disable_autostart():
-    if LAUNCH_AGENT.exists():
-        LAUNCH_AGENT.unlink()
+    if IS_MAC:
+        if LAUNCH_AGENT.exists():
+            LAUNCH_AGENT.unlink()
+    else:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
+        try:
+            winreg.DeleteValue(key, "BroadlinkAC")
+        except OSError:
+            pass
 
 
 # ── UI ──
@@ -68,7 +87,10 @@ class App(ctk.CTk):
         self.geometry("860x700")
         self.minsize(760, 620)
 
-        self._build_menu()
+        if IS_MAC:
+            self._build_menu()
+        else:
+            self._build_win_menu()
 
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(fill="both", expand=True, padx=12, pady=(12, 0))
@@ -111,6 +133,22 @@ class App(ctk.CTk):
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.config(menu=menubar)
+
+    def _build_win_menu(self):
+        """Windows 菜单栏（窗口内按钮）"""
+        bar = ctk.CTkFrame(self, height=32)
+        bar.pack(fill="x", padx=8, pady=(4, 0))
+
+        ctk.CTkButton(bar, text="⚙️ 设置", width=60, fg_color="transparent",
+                      command=self._open_settings).pack(side="left", padx=2)
+        ctk.CTkButton(bar, text="📜 日志", width=60, fg_color="transparent",
+                      command=self._open_log_dialog).pack(side="left", padx=2)
+        ctk.CTkButton(bar, text="🔧 诊断", width=60, fg_color="transparent",
+                      command=self._repair_dialog).pack(side="left", padx=2)
+        ctk.CTkButton(bar, text="About", width=60, fg_color="transparent",
+                      command=lambda: messagebox.showinfo(
+                          "About", "BroadlinkAC\n\nSmart AC controller for Broadlink RM series\n\n"
+                          "by Hermes Agent / 欧阳小白\n\ngithub.com/oywq00008-cell/BroadlinkAC-For-AI-Agent")).pack(side="right", padx=2)
 
     def _open_log_dialog(self):
         dates = get_log_dates()
