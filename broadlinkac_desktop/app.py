@@ -126,9 +126,9 @@ class App(ctk.CTk):
             "Smart AC controller for Broadlink RM series\n"
             "Multi-brand IR control + weather + typhoon monitor\n\n"
             "by Hermes Agent / 欧阳小白\n\n"
-            "github.com/oywq00008-cell/BroadlinkAC"))
+            "github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent"))
         help_menu.add_command(label="View on GitHub", command=lambda: __import__("webbrowser").open(
-            "https://github.com/oywq00008-cell/BroadlinkAC"))
+            "https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent"))
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.config(menu=menubar)
@@ -764,7 +764,6 @@ class App(ctk.CTk):
         write_log("系统", f"自动调温: {'已开启' if _cfg.config['auto_adjust'] else '已关闭'}")
 
     def _open_zoom_earth(self):
-        import webbrowser
         lat, lon = _cfg.LOCATION["lat"], _cfg.LOCATION["lon"]
         url = f"https://zoom.earth/#view={lat},{lon},8z"
         webbrowser.open(url)

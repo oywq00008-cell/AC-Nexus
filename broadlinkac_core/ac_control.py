@@ -2,7 +2,6 @@
 
 import json
 import socket
-import struct
 from datetime import datetime
 
 import broadlink
