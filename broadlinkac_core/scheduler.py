@@ -86,11 +86,13 @@ def auto_adjust_job():
     """每2小时自动调温：读日志判状态 → 跑规则 → 温度无变化则跳过"""
     state = get_last_ac_state()
     if state["power"] == "off":
-        return  # 空调没在运行
+        write_log("空调", "🔄 自动调温: 空调未运行，跳过")
+        return
 
     if _cfg._cached_temp is None:
         w = fetch_weather()
         if not w:
+            write_log("系统", "🔄 自动调温: 天气获取失败，跳过")
             return
         outdoor = float(w["temp"])
     else:
@@ -103,7 +105,9 @@ def auto_adjust_job():
         return
 
     if state["mode"] == mode and state["temp"] == target:
-        return  # 温度无变化
+        write_log("空调", f"🔄 自动调温: 室外 {outdoor}°C → 规则={MODE_KEYS.get(mode,mode)} {target}°C，"
+                  f"当前已是 {MODE_KEYS.get(state['mode'],state['mode'])} {state['temp']}°C，无需调整")
+        return
 
     try:
         send_ac("on", mode, target, "auto")
