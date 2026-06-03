@@ -109,8 +109,9 @@ def get_device():
     return d
 
 
-def send_ac(power: str, mode: str, temp: int, fan: str):
-    """发红外码，自动根据当前品牌选择协议"""
+def send_ac(power: str, mode: str, temp: int, fan: str, source="手动"):
+    """发红外码，自动根据当前品牌选择协议。
+       source: \"手动\" | \"定时\" | \"自动\" — 写入日志的前缀"""
     brand = _cfg.AC_BRAND
     t = min(max(temp, 16), 30)
 
@@ -156,10 +157,14 @@ def send_ac(power: str, mode: str, temp: int, fan: str):
     d.send_data(data)
 
     now = datetime.now()
-    action = "开机" if power == "on" else "关机"
+    label = {"手动": "手动", "定时": "定时", "自动": "自动调温"}.get(source, source)
     if power == "on":
-        return f"[{now:%H:%M}] {action} → {MODE_KEYS.get(mode, mode)} {temp}°C 风{fan}"
-    return f"[{now:%H:%M}] {action}"
+        if source == "自动":
+            return f"[{now:%H:%M}] 自动调温 → {MODE_KEYS.get(mode, mode)} {temp}°C"
+        return f"[{now:%H:%M}] {label}开机 → {MODE_KEYS.get(mode, mode)} {temp}°C"
+    if source == "自动":
+        return f"[{now:%H:%M}] 自动关机"
+    return f"[{now:%H:%M}] {label}关机"
 
 
 def decide_ac(outdoor):

@@ -2,6 +2,7 @@
 
 import time
 import threading
+from datetime import datetime
 import schedule as sch
 
 import broadlinkac_core.config as _cfg
@@ -29,8 +30,8 @@ def scheduled_job():
         return None
 
     try:
-        result = send_ac("on", mode, target, "auto")
-        write_log("空调", f"⏰ 定时触发: 室外 {outdoor}°C → 开机 {MODE_KEYS.get(mode, mode)} {target}°C")
+        result = send_ac("on", mode, target, "auto", source="定时")
+        write_log("空调", result)
         return result
     except Exception as e:
         write_log("系统", f"定时发送失败: {e}")
@@ -40,8 +41,8 @@ def scheduled_job():
 def scheduled_off_job():
     """定时关机"""
     try:
-        result = send_ac("off", "cool", 26, "auto")
-        write_log("空调", f"⏰ 定时关机: {result}")
+        result = send_ac("off", "cool", 26, "auto", source="定时")
+        write_log("空调", result)
         return result
     except Exception as e:
         write_log("系统", f"定时关机失败: {e}")
@@ -86,7 +87,6 @@ def auto_adjust_job():
     """每2小时自动调温：读日志判状态 → 跑规则 → 温度无变化则跳过"""
     state = get_last_ac_state()
     if state["power"] == "off":
-        write_log("空调", "🔄 自动调温: 空调未运行，跳过")
         return
 
     if _cfg._cached_temp is None:
@@ -100,18 +100,15 @@ def auto_adjust_job():
 
     target, mode = decide_ac(outdoor)
     if mode == "off":
-        send_ac("off", "cool", 26, "auto")
-        write_log("空调", f"🔄 自动调温: 室外 {outdoor}°C → 规则判定关闭 → 已关机")
+        write_log("空调", send_ac("off", "cool", 26, "auto", source="自动"))
         return
 
     if state["mode"] == mode and state["temp"] == target:
-        write_log("空调", f"🔄 自动调温: 室外 {outdoor}°C → 规则={MODE_KEYS.get(mode,mode)} {target}°C，"
-                  f"当前已是 {MODE_KEYS.get(state['mode'],state['mode'])} {state['temp']}°C，无需调整")
+        write_log("空调", f"[{datetime.now():%H:%M}] 自动调温 → 不更改温度")
         return
 
     try:
-        send_ac("on", mode, target, "auto")
-        write_log("空调", f"🔄 自动调温: 室外 {outdoor}°C → {MODE_KEYS.get(mode, mode)} {target}°C")
+        write_log("空调", send_ac("on", mode, target, "auto", source="自动"))
     except Exception as e:
         write_log("系统", f"自动调温失败: {e}")
 

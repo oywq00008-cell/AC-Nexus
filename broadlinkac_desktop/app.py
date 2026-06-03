@@ -805,7 +805,7 @@ class App(ctk.CTk):
             mode = MODES[self.mode_combo.get()]
             temp = self._temp_val
             fan = FANS[self.fan_combo.get()]
-            result = send_ac(power, mode, temp, fan)
+            result = send_ac(power, mode, temp, fan, source="手动")
             write_log("空调", result)
             self.after(0, lambda: self.send_status.configure(text=f"✅ {result}", text_color="#27AE60"))
         except Exception as e:

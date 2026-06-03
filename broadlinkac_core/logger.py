@@ -48,19 +48,27 @@ _LOG_MODES = {"制冷": "cool", "制热": "heat", "除湿": "dry", "送风": "fa
 
 
 def get_last_ac_state():
-    """读取今天日志，返回空调最后操作状态。
+    """读取今天日志，返回空调最后操作状态。精确匹配标准化日志格式。
 
-    Returns:
-        {"power": "on"|"off", "mode": "cool"|..., "temp": 16-30}
+    '手动开机' '定时开机' '自动调温' '开机' → on
+    '手动关机' '定时关机' '自动关机' '关机' → off
+    '不更改温度' → 跳过，继续往上找
     """
     date_str = datetime.now().strftime("%Y-%m-%d")
     log_file = LOG_DIR / f"{date_str}.md"
     if not log_file.exists():
         return {"power": "off", "mode": "cool", "temp": 26}
 
+    ON_WORDS = ("手动开机", "定时开机", "自动调温", "开机")
+    OFF_WORDS = ("手动关机", "定时关机", "自动关机", "关机")
+
     lines = log_file.read_text(encoding="utf-8").split("\n")
     for line in reversed(lines):
-        if "开机" in line and ("→" in line or "°C" in line):
+        if "不更改温度" in line:
+            continue
+        if any(w in line for w in OFF_WORDS):
+            return {"power": "off", "mode": "cool", "temp": 26}
+        if any(w in line for w in ON_WORDS):
             mode = "cool"
             temp = 26
             m = re.search(r"→\s*(.+?)\s*(\d+)°C", line)
@@ -68,6 +76,4 @@ def get_last_ac_state():
                 mode = _LOG_MODES.get(m.group(1), "cool")
                 temp = int(m.group(2))
             return {"power": "on", "mode": mode, "temp": temp}
-        if re.search(r"(\]\s*关机|定时关机:|已关机)", line):
-            return {"power": "off", "mode": "cool", "temp": 26}
     return {"power": "off", "mode": "cool", "temp": 26}
