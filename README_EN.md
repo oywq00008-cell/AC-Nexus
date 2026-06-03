@@ -2,7 +2,7 @@
 
 [中文](README.md) | English
 
-Smart AC controller for Broadlink RM series — macOS desktop app + **AI Agent programmable API**.
+Smart AC controller for Broadlink RM series — macOS / Windows desktop app + **AI Agent programmable API**.
 
 > 💡 **Daily auto on/off** · **Smart temperature rules** · **Auto-adjust every 2h** · **Weather alerts + typhoon** · **Zero-setup Agent API**.
 
@@ -42,17 +42,20 @@ send_ac("off", "cool", 26, "auto")  # Turn off
 
 ## 🧰 Hardware
 
-- A Mac (Apple Silicon / Intel)
+- A computer (macOS / Windows / Linux)
 - [Broadlink RM series](https://www.broadlink.com.cn/) IR blaster (RM Mini / RM Pro / RM4 Mini etc.)
 - Supported AC
 
 ## 🚀 Quick Start
 
-### Option 1: Download .app (recommended)
+### Option 1: Download (recommended)
 
-Download from [Releases](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases), double-click.
+| Platform | Download |
+|----------|----------|
+| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases/latest) |
+| Windows | [BroadlinkAC-Windows.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases/latest) |
 
-If Gatekeeper blocks it:
+On macOS, if Gatekeeper blocks:
 ```bash
 xattr -cr /Applications/BroadlinkAC.app
 ```
@@ -66,21 +69,22 @@ pip install -r requirements.txt
 python3 ac_controller.py
 ```
 
-### Option 3: Agent auto control
+### Option 3: Agent / Headless (Linux / Raspberry Pi / Server)
 
 ```bash
 git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
-cd BroadlinkAC
-pip install -r requirements.txt
+cd BroadlinkAC-For-AI-Agent
+pip install -r requirements-core.txt
 ```
 
 ```python
-from broadlinkac_core import init, send_ac, fetch_weather
+from broadlinkac_core import init, send_ac
 
 init(api_key="your_key", qw_host="https://your_host")
-weather = fetch_weather()
 send_ac("on", "cool", 26, "auto")
 ```
+
+No GUI needed — `broadlinkac_core/` is pure Python, runs on Linux / Ubuntu / Debian / Raspberry Pi.
 
 ## ⚙️ Configuration
 
@@ -106,13 +110,14 @@ broadlinkac_core/             # Core library (no GUI dep)
 ├── ac_control.py             # AC control + IR
 ├── scheduler.py              # Scheduler + auto-adjust
 └── logger.py                 # Logging
-broadlinkac_desktop/          # macOS GUI
+broadlinkac_desktop/          # Desktop GUI (cross-platform)
 └── app.py                    # CustomTkinter UI
 protocols/                    # IR protocols (C++ port)
 ├── haier.py
-├── aux.py
+├── aux_ac.py                 # AUX (Electra protocol)
 └── panasonic.py
 requirements.txt
+requirements-core.txt         # Headless mode (no GUI deps)
 ```
 
 ## 🔐 Privacy

@@ -2,7 +2,7 @@
 
 [English](README_EN.md) | 中文
 
-博联空调智能控制器 — macOS 桌面应用 + **AI Agent 可编程调用**。
+博联空调智能控制器 — macOS / Windows 桌面应用 + **AI Agent 可编程调用**。
 
 > 💡 **每天定时自动开关** · **根据室外温度智能调温** · **每2小时自动微调** · **天气预警 + 台风监测** · **Agent 零门槛调用**。
 
@@ -42,17 +42,20 @@ send_ac("off", "cool", 26, "auto")  # 关机
 
 ## 🧰 硬件要求
 
-- 一台 Mac（Apple Silicon / Intel）
+- 一台电脑（macOS / Windows / Linux）
 - [Broadlink RM 系列](https://www.broadlink.com.cn/) 红外遥控器（RM Mini / RM Pro / RM4 Mini 等）
 - 支持品牌的空调
 
 ## 🚀 快速开始
 
-### 方式一：下载 .app（推荐）
+### 方式一：下载安装包（推荐）
 
-从 [Releases](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases) 下载 `BroadlinkAC.app`，双击运行。
+| 平台 | 下载 |
+|------|------|
+| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases/latest) |
+| Windows | [BroadlinkAC-Windows.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases/latest) |
 
-首次提示「无法验证开发者」：
+macOS 首次提示「无法验证开发者」：
 ```bash
 xattr -cr /Applications/BroadlinkAC.app
 ```
@@ -106,13 +109,14 @@ broadlinkac_core/             # 核心库（零 GUI 依赖）
 ├── ac_control.py             # 空调控制 + 发码
 ├── scheduler.py              # 定时任务 + 自动调温
 └── logger.py                 # 日志
-broadlinkac_desktop/          # macOS GUI
+broadlinkac_desktop/          # 桌面 GUI（跨平台）
 └── app.py                    # CustomTkinter 界面
 protocols/                    # 红外协议（C++ 移植）
 ├── haier.py
-├── aux.py
+├── aux_ac.py                 # AUX（Electra 协议）
 └── panasonic.py
 requirements.txt
+requirements-core.txt         # 无头模式（无 GUI 依赖）
 ```
 
 ## 🔐 隐私
