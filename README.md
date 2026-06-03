@@ -66,22 +66,22 @@ pip install -r requirements.txt
 python3 ac_controller.py
 ```
 
-### 方式三：Agent 全自动调用
+### 方式三：Agent / 无头模式（Linux / 树莓派 / 服务器）
 
 ```bash
 git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
-cd BroadlinkAC
-pip install -r requirements.txt
+cd BroadlinkAC-For-AI-Agent
+pip install -r requirements-core.txt
 ```
 
 ```python
-from broadlinkac_core import init, send_ac, fetch_weather
+from broadlinkac_core import init, send_ac
 
 init(api_key="你的Key", qw_host="https://你的Host")
-weather = fetch_weather()
 send_ac("on", "cool", 26, "auto")
 ```
 
+无需 GUI，`broadlinkac_core/` 纯 Python 跨平台，Linux / Ubuntu / Debian / 树莓派均可运行。
 ## ⚙️ 配置
 
 首次运行后在菜单栏 **设置** 中填入：
