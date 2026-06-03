@@ -64,6 +64,9 @@ def get_last_ac_state():
 
     lines = log_file.read_text(encoding="utf-8").split("\n")
     for line in reversed(lines):
+        # 只处理带 [HH:MM] 时间标记的 AC 操作行（系统设置不带）
+        if not re.search(r"\[\d{2}:\d{2}\]", line):
+            continue
         if "不更改温度" in line:
             continue
         if any(w in line for w in OFF_WORDS):
