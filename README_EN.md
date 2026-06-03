@@ -110,7 +110,7 @@ broadlinkac_desktop/          # macOS GUI
 └── app.py                    # CustomTkinter UI
 protocols/                    # IR protocols (C++ port)
 ├── haier.py
-├── aux.py
+├── electra.py          # AUX (Electra 协议)
 └── panasonic.py
 requirements.txt
 ```

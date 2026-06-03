@@ -110,7 +110,7 @@ broadlinkac_desktop/          # macOS GUI
 └── app.py                    # CustomTkinter 界面
 protocols/                    # 红外协议（C++ 移植）
 ├── haier.py
-├── aux.py
+├── electra.py          # AUX (Electra 协议)
 └── panasonic.py
 requirements.txt
 ```

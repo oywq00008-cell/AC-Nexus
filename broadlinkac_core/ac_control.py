@@ -78,7 +78,9 @@ def send_ac(power: str, mode: str, temp: int, fan: str):
         hsw = getattr(sender, "HDIR_SWING", None)
         sender.send(pwr, m, f, t, vsw, hsw, False)
     else:
-        mod = __import__(f"protocols.{brand}", fromlist=[brand])
+        # "aux" 是 Windows 保留文件名，映射到 electra.py
+        brand_file = {"aux": "electra"}.get(brand, brand)
+        mod = __import__(f"protocols.{brand_file}", fromlist=[brand_file])
         cls_map = {"haier": "Haier", "aux": "AUX", "panasonic": "Panasonic"}
         cls_name = cls_map.get(brand, brand.capitalize())
         sender = getattr(mod, cls_name)()
