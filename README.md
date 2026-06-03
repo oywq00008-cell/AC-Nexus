@@ -122,3 +122,11 @@ requirements.txt
 ## 📜 协议
 
 MIT License
+
+## 💝 致谢
+
+- [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — 海尔/奥克斯/松下红外协议 C++ 源码参考
+- [python-broadlink](https://github.com/mjg59/python-broadlink) — 博联 RM 设备 Python 驱动
+- [hvac_ir](https://github.com/nicko858/hvac_ir) — 格力/美的/海信/大金/三菱红外协议库
+- [和风天气](https://www.qweather.com) — 天气与预警数据
+- [中央气象台](https://www.nmc.cn) — 台风监测数据

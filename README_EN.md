@@ -122,3 +122,11 @@ All config stored locally in `~/.ac_controller/`. Nothing uploaded. Weather and 
 ## 📜 License
 
 MIT License
+
+## 💝 Acknowledgments
+
+- [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ reference for Haier/AUX/Panasonic IR protocols
+- [python-broadlink](https://github.com/mjg59/python-broadlink) — Broadlink RM device Python driver
+- [hvac_ir](https://github.com/nicko858/hvac_ir) — Gree/Midea/Hisense/Daikin/Mitsubishi IR protocol library
+- [QWeather](https://www.qweather.com) — Weather and alert data
+- [China NMC](https://www.nmc.cn) — Typhoon monitoring data
