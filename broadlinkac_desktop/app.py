@@ -701,7 +701,7 @@ class App(ctk.CTk):
         if not alerts:
             ctk.CTkLabel(self.alert_list, text="✅ 暂无预警信息",
                          font=ctk.CTkFont(size=13), text_color="#27AE60").pack(pady=30)
-            self.update_idletasks()
+            self.tab_ty.update_idletasks()
             return
 
         # 按严重程度排序: 红>橙>黄>蓝
@@ -746,7 +746,7 @@ class App(ctk.CTk):
             if eff and exp:
                 ctk.CTkLabel(card, text=f"📅 {eff} → {exp}",
                              font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=8, pady=(2, 4))
-        self.update_idletasks()
+        self.tab_ty.update_idletasks()
 
     def _save_ty_settings(self):
         try:
@@ -1028,7 +1028,7 @@ class App(ctk.CTk):
             ctk.CTkLabel(self.ty_list, text="西北太平洋当前无活跃台风 ✅",
                          font=ctk.CTkFont(size=14)).pack(pady=30)
             self.ty_time_label.configure(text=f"上次更新: {datetime.now():%H:%M}")
-            self.update_idletasks()
+            self.tab_ty.update_idletasks()
             return
 
         for t in typhoons:
@@ -1080,4 +1080,4 @@ class App(ctk.CTk):
             write_log("台风", f"{detail['cn']} {detail['cat']} {detail['lat']}N,{detail['lon']}E 距{dist}km {status}")
 
         self.ty_time_label.configure(text=f"上次更新: {datetime.now():%H:%M}")
-        self.update_idletasks()
+        self.tab_ty.update_idletasks()
