@@ -3,3 +3,4 @@ customtkinter>=5.2.0
 schedule>=1.2.0
 tkcalendar>=1.6.1
 hvac_ir>=0.7.0
+netifaces>=0.11.0

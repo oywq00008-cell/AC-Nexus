@@ -1,6 +1,8 @@
 """BroadlinkAC Core — 空调控制（博联设备 + 红外发码 + 温度规则）"""
 
 import json
+import socket
+import struct
 from datetime import datetime
 
 import broadlink
@@ -38,6 +40,52 @@ def save_device_cache(device):
     DEVICE_CACHE.write_text(json.dumps(info, indent=2))
 
 
+def _get_local_ips():
+    """获取本机所有非回环 IPv4 地址（排除 127.x, docker, 虚拟网卡等）"""
+    ips = []
+    try:
+        import netifaces
+        for iface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface).get(netifaces.AF_INET, [])
+            for addr in addrs:
+                ip = addr.get('addr', '')
+                if ip and not ip.startswith('127.') and ip != '0.0.0.0':
+                    ips.append(ip)
+    except ImportError:
+        pass
+
+    if not ips:
+        # fallback: 用 socket 连接外部地址来推断本机 IP
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 1))
+            ip = s.getsockname()[0]
+            s.close()
+            if ip and not ip.startswith('127.'):
+                ips.append(ip)
+        except Exception:
+            ips.append('0.0.0.0')
+    return ips
+
+
+def discover_devices(timeout=5):
+    """遍历所有本机网卡，逐个尝试 UDP 广播发现博联设备。返回设备列表。"""
+    local_ips = _get_local_ips()
+    all_devices = []
+    for ip in local_ips:
+        try:
+            devices = broadlink.discover(
+                timeout=timeout,
+                local_ip_address=ip,
+                discover_ip_address='255.255.255.255',
+                discover_ip_port=80,
+            )
+            all_devices.extend(devices)
+        except Exception:
+            pass
+    return all_devices
+
+
 def get_device():
     """获取博联设备: 优先缓存直连, 失败则重新扫描并更新缓存"""
     cached = load_device_cache()
@@ -48,10 +96,14 @@ def get_device():
             return d
         except Exception:
             pass
-    devices = broadlink.discover(timeout=5)
-    if not devices:
-        raise Exception("未发现博联设备")
-    d = devices[0]
+
+    all_devices = discover_devices(timeout=5)
+
+    if not all_devices:
+        raise Exception("未发现博联设备，请确认：\n1. 电脑和博联设备在同一个局域网\n"
+                        "2. Windows 防火墙允许 UDP 端口 80 的入站/出站通信")
+
+    d = all_devices[0]
     d.auth()
     save_device_cache(d)
     return d
@@ -79,17 +131,17 @@ def send_ac(power: str, mode: str, temp: int, fan: str):
         sender.send(pwr, m, f, t, vsw, hsw, False)
     else:
         mod = __import__(f"protocols.{brand}", fromlist=[brand])
-        cls_map = {"haier": "Haier", "aux": "AUX", "panasonic": "Panasonic"}
+        cls_map = {"haier": "Haier", "aux_ac": "AUX", "panasonic": "Panasonic"}
         cls_name = cls_map.get(brand, brand.capitalize())
         sender = getattr(mod, cls_name)()
         mode_maps = {
             "haier": {"auto": 0x00, "cool": 0x01, "dry": 0x02, "fan": 0x04, "heat": 0x03},
-            "aux":   {"auto": 0, "cool": 1, "dry": 2, "fan": 6, "heat": 4},
+            "aux_ac": {"auto": 0, "cool": 1, "dry": 2, "fan": 6, "heat": 4},
             "panasonic": {"auto": 0, "cool": 3, "dry": 2, "fan": 6, "heat": 4},
         }
         fan_maps = {
             "haier": {"auto": 0x00, "1": 0x01, "2": 0x02, "3": 0x03},
-            "aux":   {"auto": 5, "1": 1, "2": 2, "3": 3},
+            "aux_ac": {"auto": 5, "1": 1, "2": 2, "3": 3},
             "panasonic": {"auto": 7, "1": 3, "2": 2, "3": 1},
         }
         mode_map = mode_maps.get(brand, {"auto": 0, "cool": 1, "dry": 2, "fan": 3, "heat": 4})

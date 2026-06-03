@@ -2,15 +2,25 @@
 
 import json
 import gzip
+import ssl
 import urllib.request
 import urllib.parse
 import broadlinkac_core.config as _cfg
 
 
+def _urlopen(url, timeout=8):
+    """兼容 Windows：绕过自签名证书验证"""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC/2.0"})
+    return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+
+
 def fetch_weather():
     url = f"{_cfg.QW_HOST}/v7/weather/now?location={_cfg.LOCATION['lon']},{_cfg.LOCATION['lat']}&key={_cfg.QW_KEY}"
     try:
-        raw = urllib.request.urlopen(url, timeout=8).read()
+        raw = _urlopen(url).read()
         data = json.loads(gzip.decompress(raw))
         if data["code"] == "200":
             return data["now"]
@@ -26,8 +36,7 @@ def city_lookup(query: str):
         "accept-language": "zh", "countrycodes": "cn"
     })
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "AC_Controller/1.0"})
-        raw = urllib.request.urlopen(req, timeout=8).read()
+        raw = _urlopen(url).read()
         data = json.loads(raw)
         return [{
             "name": r.get("name", ""),
@@ -40,8 +49,7 @@ def city_lookup(query: str):
 
 
 def fetch_weather_alerts():
-    """获取当地天气预警 → [{id, senderName, headline, severity,
-        eventType, description, effectiveTime, expireTime, color, instruction}, ...]"""
+    """获取当地天气预警"""
     host = _cfg.QW_HOST
     key = _cfg.QW_KEY
     if not host or not key:
@@ -50,7 +58,7 @@ def fetch_weather_alerts():
     lon = _cfg.LOCATION["lon"]
     url = f"{host}/weatheralert/v1/current/{lat:.2f}/{lon:.2f}?key={key}"
     try:
-        raw = urllib.request.urlopen(url, timeout=8).read()
+        raw = _urlopen(url).read()
         data = json.loads(gzip.decompress(raw))
         return data.get("alerts", [])
     except Exception as e:

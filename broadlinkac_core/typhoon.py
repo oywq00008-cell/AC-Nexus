@@ -3,17 +3,27 @@
 import json
 import math
 import re
+import ssl
 import urllib.request
 from datetime import datetime
 
 NMC_HOST = "https://typhoon.nmc.cn/weatherservice"
 
 
+def _urlopen(url, timeout=8):
+    """兼容 Windows：绕过自签名证书验证"""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC/2.0"})
+    return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+
+
 def fetch_typhoons():
     year = datetime.now().year
     url = f"{NMC_HOST}/typhoon/jsons/list_{year}?callback=cb"
     try:
-        resp = urllib.request.urlopen(url, timeout=8).read().decode("utf-8")
+        resp = _urlopen(url).read().decode("utf-8")
         body = re.search(r'\((.*)\)', resp, re.DOTALL)
         if not body:
             return []
@@ -31,10 +41,10 @@ def fetch_typhoons():
     return []
 
 
-def fetch_typhoon_detail(tid):
-    url = f"{NMC_HOST}/typhoon/jsons/view_{tid}?callback=cb"
+def fetch_typhoon_detail(ty_id):
+    url = f"{NMC_HOST}/typhoon/jsons/view_{ty_id}?callback=cb"
     try:
-        resp = urllib.request.urlopen(url, timeout=8).read().decode("utf-8")
+        resp = _urlopen(url).read().decode("utf-8")
         body = re.search(r'\((.*)\)', resp, re.DOTALL)
         if not body:
             return None

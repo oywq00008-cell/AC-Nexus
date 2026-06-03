@@ -20,7 +20,7 @@ AC_BRAND = "gree"
 # ── 品牌映射 ──
 AC_BRANDS = {
     "格力": "gree", "美的": "midea", "海尔": "haier", "华凌": "midea",
-    "奥克斯": "aux", "海信": "hisense", "大金": "daikin", "三菱": "mitsubishi",
+    "奥克斯": "aux_ac", "海信": "hisense", "大金": "daikin", "三菱": "mitsubishi",
     "小米": "midea", "松下": "panasonic",
 }
 

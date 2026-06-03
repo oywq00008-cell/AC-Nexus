@@ -11,8 +11,7 @@ from pathlib import Path
 import customtkinter as ctk
 from tkinter import Menu, Toplevel, messagebox
 from tkcalendar import Calendar
-
-import broadlink
+import webbrowser
 
 import broadlinkac_core.config as _cfg
 
@@ -22,7 +21,7 @@ from broadlinkac_core.config import (
 )
 from broadlinkac_core.ac_control import (
     MODES, FANS, MODE_KEYS,
-    load_device_cache, save_device_cache, send_ac,
+    load_device_cache, save_device_cache, send_ac, discover_devices,
 )
 from broadlinkac_core.weather import fetch_weather, city_lookup, fetch_weather_alerts
 from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, calc_distance
@@ -83,8 +82,8 @@ ctk.set_default_color_theme("blue")
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title(APP_NAME + "  v2")
-        self.geometry("860x700")
+        self.title(APP_NAME + "  v3")
+        self.geometry("860x750")
         self.minsize(760, 620)
 
         if IS_MAC:
@@ -139,16 +138,41 @@ class App(ctk.CTk):
         bar = ctk.CTkFrame(self, height=32)
         bar.pack(fill="x", padx=8, pady=(4, 0))
 
-        ctk.CTkButton(bar, text="⚙️ 设置", width=60, fg_color="transparent",
-                      command=self._open_settings).pack(side="left", padx=2)
-        ctk.CTkButton(bar, text="📜 日志", width=60, fg_color="transparent",
-                      command=self._open_log_dialog).pack(side="left", padx=2)
-        ctk.CTkButton(bar, text="🔧 诊断", width=60, fg_color="transparent",
-                      command=self._repair_dialog).pack(side="left", padx=2)
-        ctk.CTkButton(bar, text="About", width=60, fg_color="transparent",
-                      command=lambda: messagebox.showinfo(
-                          "About", "BroadlinkAC\n\nSmart AC controller for Broadlink RM series\n\n"
-                          "by Hermes Agent / 欧阳小白\n\ngithub.com/oywq00008-cell/BroadlinkAC-For-AI-Agent")).pack(side="right", padx=2)
+        btn_opts = dict(width=60, fg_color="transparent",
+                        text_color=["#1a1a1a", "#dce4f0"])
+        ctk.CTkButton(bar, text="⚙️ 设置", command=self._open_settings, **btn_opts).pack(side="left", padx=2)
+        ctk.CTkButton(bar, text="📜 日志", command=self._open_log_dialog, **btn_opts).pack(side="left", padx=2)
+        ctk.CTkButton(bar, text="🔧 诊断", command=self._repair_dialog, **btn_opts).pack(side="left", padx=2)
+        about_btn = ctk.CTkButton(bar, text="About", command=self._show_about, **btn_opts)
+        about_btn.pack(side="right", padx=2)
+
+    def _show_about(self):
+        """自定义 About 弹窗，支持可点击链接"""
+        dlg = Toplevel(self)
+        dlg.title("About BroadlinkAC")
+        dlg.geometry("380x290")
+        dlg.transient(self)
+        dlg.grab_set()
+
+        ctk.CTkLabel(dlg, text="BroadlinkAC  v3", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(20, 10))
+        ctk.CTkLabel(dlg, text="Smart AC controller for Broadlink RM series",
+                     font=ctk.CTkFont(size=12), text_color=["#666", "#aaa"]).pack()
+        ctk.CTkLabel(dlg, text="by Hermes Agent / 欧阳小白",
+                     font=ctk.CTkFont(size=12)).pack(pady=(5, 5))
+
+        ctk.CTkLabel(dlg, text="本软件基于 MIT 开源协议，完全免费",
+                     font=ctk.CTkFont(size=10), text_color=["#666", "#aaa"]).pack()
+        ctk.CTkLabel(dlg, text="软件中不包含任何付费链接和广告",
+                     font=ctk.CTkFont(size=10), text_color=["#666", "#aaa"]).pack(pady=(0, 10))
+
+        link = ctk.CTkLabel(dlg, text="🔗 github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent",
+                            font=ctk.CTkFont(size=11, underline=True),
+                            text_color=["#2E86C1", "#5DADE2"], cursor="hand2")
+        link.pack(pady=(5, 0))
+        link.bind("<Button-1>", lambda e: webbrowser.open(
+            "https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent"))
+
+        ctk.CTkButton(dlg, text="关闭", width=80, command=dlg.destroy).pack(pady=(15, 0))
 
     def _open_log_dialog(self):
         dates = get_log_dates()
@@ -854,7 +878,7 @@ class App(ctk.CTk):
             old_ip = old_cache["host"] if old_cache else None
 
             try:
-                devices = broadlink.discover(timeout=5)
+                devices = discover_devices(timeout=5)
                 if devices:
                     d = devices[0]
                     new_ip = d.host[0]
