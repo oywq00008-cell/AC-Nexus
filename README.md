@@ -42,7 +42,7 @@ send_ac("off", "cool", 26, "auto")  # 关机
 
 ## 🧰 硬件要求
 
-- 一台电脑（macOS / Windows / Linux）
+- 任何能运行 Python 3.9+ 的设备（macOS / Windows / Linux / 树莓派 / NAS / 服务器）
 - [Broadlink RM 系列](https://www.broadlink.com.cn/) 红外遥控器（RM Mini / RM Pro / RM4 Mini 等）
 - 支持品牌的空调
 

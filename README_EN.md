@@ -42,7 +42,7 @@ send_ac("off", "cool", 26, "auto")  # Turn off
 
 ## 🧰 Hardware
 
-- A computer (macOS / Windows / Linux)
+- Any device running Python 3.9+ (macOS / Windows / Linux / Raspberry Pi / NAS / server)
 - [Broadlink RM series](https://www.broadlink.com.cn/) IR blaster (RM Mini / RM Pro / RM4 Mini etc.)
 - Supported AC
 
