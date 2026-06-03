@@ -30,7 +30,7 @@ def scheduled_job():
 
     try:
         result = send_ac("on", mode, target, "auto")
-        write_log("空调", f"⏰ 定时触发: 室外 {outdoor}°C → {MODE_KEYS.get(mode, mode)} {target}°C")
+        write_log("空调", f"⏰ 定时触发: 室外 {outdoor}°C → 开机 {MODE_KEYS.get(mode, mode)} {target}°C")
         return result
     except Exception as e:
         write_log("系统", f"定时发送失败: {e}")

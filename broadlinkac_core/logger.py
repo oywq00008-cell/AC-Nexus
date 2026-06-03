@@ -60,7 +60,7 @@ def get_last_ac_state():
 
     lines = log_file.read_text(encoding="utf-8").split("\n")
     for line in reversed(lines):
-        if "开机 →" in line:
+        if "开机" in line and ("→" in line or "°C" in line):
             mode = "cool"
             temp = 26
             m = re.search(r"→\s*(.+?)\s*(\d+)°C", line)
