@@ -1,5 +1,6 @@
 ---
 name: broadlinkac
+version: 3.0.0
 description: Control air conditioners via Broadlink RM devices — multi-brand IR control, weather monitoring, typhoon alerts, scheduled automation. Clone, pip install, import — zero-config Agent API.
 ---
 
