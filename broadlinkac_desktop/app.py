@@ -91,6 +91,9 @@ class App(ctk.CTk):
         else:
             self._build_win_menu()
 
+        # 主题
+        ctk.set_appearance_mode(_cfg.config.get("appearance_mode", "system"))
+
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(fill="both", expand=True, padx=12, pady=(12, 0))
         self.tab_ac = self.tabview.add("🎮 空调控制")
@@ -99,9 +102,14 @@ class App(ctk.CTk):
         self._build_ac_tab()
         self._build_ty_tab()
 
+        # 缓存
+        self._weather_data = None
+        self._alerts_data = []
+        self._typhoons_data = []
+
         self._wx_timer_id = None
-        self._auto_wx_refresh()
-        self.after(800, self._refresh_typhoon)
+        self._fetch_all()
+        self.after(800, self._render_all)
 
     # ── 菜单栏 ──
     def _build_menu(self):
@@ -148,7 +156,7 @@ class App(ctk.CTk):
 
     def _show_about(self):
         """自定义 About 弹窗，支持可点击链接"""
-        dlg = Toplevel(self)
+        dlg = ctk.CTkToplevel(self)
         dlg.title("About BroadlinkAC")
         dlg.geometry("380x290")
         dlg.transient(self)
@@ -180,7 +188,7 @@ class App(ctk.CTk):
             messagebox.showinfo("日志", "暂无日志记录。")
             return
 
-        dlg = Toplevel(self)
+        dlg = ctk.CTkToplevel(self)
         dlg.title("📅 选择日期")
         dlg.geometry("300x320")
         dlg.resizable(False, False)
@@ -189,88 +197,138 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(dlg, text="选择日期查看日志", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(15, 5))
 
-        cal = Calendar(dlg, selectmode="day", date_pattern="yyyy-mm-dd", firstweekday="monday")
+        cal = Calendar(dlg, selectmode="day", date_pattern="yyyy-mm-dd",
+                       firstweekday="monday", showweeknumbers=False)
         cal.pack(padx=20, pady=10)
+
+        # ── 日历配色适配主题 ──
+        is_dark = ctk.get_appearance_mode() == "Dark"
+        if is_dark:
+            cal.configure(
+                background="#2b2b2b", foreground="#4A90D9",
+                headersbackground="#333333", headersforeground="#4A90D9",
+                normalbackground="#2b2b2b", normalforeground="#4A90D9",
+                weekendbackground="#2b2b2b", weekendforeground="#4A90D9",
+                othermonthbackground="#2b2b2b", othermonthforeground="#555555",
+                selectbackground="#1a3a5c", selectforeground="white",
+            )
+            log_bg, log_fg = "#4a1a1a", "#E74C3C"
+        else:
+            cal.configure(
+                foreground="#4A90D9",
+                normalforeground="#4A90D9",
+                weekendforeground="#4A90D9",
+                othermonthforeground="#333333",
+            )
+            log_bg, log_fg = "#FADBD8", "#E74C3C"
 
         for d in dates:
             try:
                 cal.calevent_create(datetime.strptime(d, "%Y-%m-%d"), "", "log")
-                cal.tag_config("log", background="#4A90D9", foreground="white")
+                cal.tag_config("log", background=log_bg, foreground=log_fg)
             except:
                 pass
 
         def on_open():
             date = cal.get_date()
             dlg.destroy()
-            self._show_log_window(date)
+            import subprocess, os
+            log_path = LOG_DIR / f"{date}.md"
+            if os.name == "nt":
+                os.startfile(str(log_path))
+            else:
+                subprocess.run(["open", str(log_path)])
 
         btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
         btn_frame.pack(pady=(5, 10))
         ctk.CTkButton(btn_frame, text="取消", fg_color="gray", command=dlg.destroy).pack(side="left", padx=5)
         ctk.CTkButton(btn_frame, text="打开日志", command=on_open).pack(side="left", padx=5)
 
-    def _show_log_window(self, date_str):
-        win = Toplevel(self)
-        win.title(f"📜 {date_str} 操作日志")
-        win.geometry("640x500")
-        win.transient(self)
-
-        content = read_log(date_str)
-        text = ctk.CTkTextbox(win, font=ctk.CTkFont(size=13), wrap="word")
-        text.pack(fill="both", expand=True, padx=10, pady=10)
-        text.insert("1.0", content)
-        text.configure(state="disabled")
 
     # ── 设置窗口 ──
     def _open_settings(self):
-        dlg = Toplevel(self)
+        dlg = ctk.CTkToplevel(self)
         dlg.title("⚙️ 设置")
-        dlg.geometry("480x540")
+        dlg.geometry("500x680")
         dlg.transient(self)
         dlg.grab_set()
 
-        ctk.CTkLabel(dlg, text="┌─ 和风 API Key", font=ctk.CTkFont(size=12, weight="bold"),
-                     text_color="#888").pack(anchor="w", padx=20, pady=(15, 2))
-        api_entry = ctk.CTkEntry(dlg, width=400, show="*")
+        card_style = dict(border_width=1, border_color="#4A4A4A", corner_radius=8)
+
+        # ── 卡片1: 和风天气 ──
+        card1 = ctk.CTkFrame(dlg)
+        card1.configure(**card_style)
+        card1.pack(fill="x", padx=20, pady=(15, 8), ipady=5)
+
+        ctk.CTkLabel(card1, text="🌤️ 和风天气", font=ctk.CTkFont(size=13, weight="bold")).pack(
+            anchor="w", padx=12, pady=(8, 2))
+        ctk.CTkLabel(card1, text="API Key", font=ctk.CTkFont(size=11), text_color="#888").pack(
+            anchor="w", padx=12, pady=(5, 0))
+        api_entry = ctk.CTkEntry(card1, width=400, show="*")
         api_entry.insert(0, _cfg.QW_KEY)
-        api_entry.pack(padx=20)
+        api_entry.pack(padx=12, pady=(0, 5))
 
-        ctk.CTkLabel(dlg, text="┌─ 和风个人 Host", font=ctk.CTkFont(size=12, weight="bold"),
-                     text_color="#888").pack(anchor="w", padx=20, pady=(10, 2))
-        host_entry = ctk.CTkEntry(dlg, width=400, placeholder_text="https://xxx.re.qweatherapi.com")
+        ctk.CTkLabel(card1, text="个人 Host", font=ctk.CTkFont(size=11), text_color="#888").pack(
+            anchor="w", padx=12, pady=(5, 0))
+        host_entry = ctk.CTkEntry(card1, width=400, placeholder_text="https://xxx.re.qweatherapi.com")
         host_entry.insert(0, _cfg.QW_HOST)
-        host_entry.pack(padx=20)
-        ctk.CTkLabel(dlg, text="💡 免费订阅的和风 API 需填入个人 Host 地址",
-                     font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=20)
+        host_entry.pack(padx=12)
+        ctk.CTkLabel(card1, text="💡 免费订阅需填入个人 Host 地址",
+                     font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=12, pady=(2, 8))
 
-        auto_frame = ctk.CTkFrame(dlg, fg_color="transparent")
-        auto_frame.pack(fill="x", padx=20, pady=(10, 2))
-        auto_switch = ctk.CTkSwitch(auto_frame, text="开机自启动")
+        # ── 卡片2: 基础设置 ──
+        card2 = ctk.CTkFrame(dlg)
+        card2.configure(**card_style)
+        card2.pack(fill="x", padx=20, pady=(0, 8), ipady=5)
+
+        ctk.CTkLabel(card2, text="⚙️ 基础设置", font=ctk.CTkFont(size=13, weight="bold")).pack(
+            anchor="w", padx=12, pady=(8, 2))
+
+        # 品牌
+        brand_row = ctk.CTkFrame(card2, fg_color="transparent")
+        brand_row.pack(fill="x", padx=12, pady=(5, 2))
+        ctk.CTkLabel(brand_row, text="空调品牌:").pack(side="left")
+        brand_combo = ctk.CTkComboBox(brand_row, values=list(AC_BRANDS.keys()), width=120)
+        brand_combo.set(_cfg.config.get("brand", "格力"))
+        brand_combo.pack(side="left", padx=8)
+
+        # 主题
+        theme_row = ctk.CTkFrame(card2, fg_color="transparent")
+        theme_row.pack(fill="x", padx=12, pady=(5, 2))
+        ctk.CTkLabel(theme_row, text="主题:").pack(side="left")
+        theme_combo = ctk.CTkComboBox(theme_row, values=["跟随系统", "亮色", "暗色"], width=100)
+        theme_combo.set({"system": "跟随系统", "light": "亮色", "dark": "暗色"}.get(
+            _cfg.config.get("appearance_mode", "system"), "跟随系统"))
+        theme_combo.pack(side="left", padx=8)
+
+        # 开机自启
+        auto_row = ctk.CTkFrame(card2, fg_color="transparent")
+        auto_row.pack(fill="x", padx=12, pady=(5, 8))
+        auto_switch = ctk.CTkSwitch(auto_row, text="开机自启动")
         auto_switch.pack(side="left")
         if check_autostart():
             auto_switch.select()
 
-        brand_frame = ctk.CTkFrame(dlg, fg_color="transparent")
-        brand_frame.pack(fill="x", padx=20, pady=(10, 2))
-        ctk.CTkLabel(brand_frame, text="空调品牌:").pack(side="left")
-        brand_combo = ctk.CTkComboBox(brand_frame, values=list(AC_BRANDS.keys()), width=120)
-        brand_combo.set(_cfg.config.get("brand", "格力"))
-        brand_combo.pack(side="left", padx=5)
+        # ── 卡片3: 城市设置 ──
+        card3 = ctk.CTkFrame(dlg)
+        card3.configure(**card_style)
+        card3.pack(fill="x", padx=20, pady=(0, 8), ipady=5)
 
-        ctk.CTkLabel(dlg, text="📍 城市设置", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(15, 5))
+        ctk.CTkLabel(card3, text="📍 城市设置", font=ctk.CTkFont(size=13, weight="bold")).pack(
+            anchor="w", padx=12, pady=(8, 2))
 
-        loc_info = ctk.CTkLabel(dlg, text=f"当前: {_cfg.LOCATION['name']} ({_cfg.LOCATION['lat']}°N, {_cfg.LOCATION['lon']}°E)",
+        loc_info = ctk.CTkLabel(card3, text=f"当前: {_cfg.LOCATION['name']} ({_cfg.LOCATION['lat']}°N, {_cfg.LOCATION['lon']}°E)",
                                 font=ctk.CTkFont(size=12), text_color="#27AE60")
-        loc_info.pack(anchor="w", padx=20)
+        loc_info.pack(anchor="w", padx=12, pady=(5, 0))
 
-        ctk.CTkButton(dlg, text="📍 自动定位", fg_color="#555", width=120,
-                      command=lambda: self._auto_locate(loc_info)).pack(anchor="w", padx=20, pady=(5, 2))
-        ctk.CTkLabel(dlg, text="💡 自动定位基于网络 IP，可能有偏差，建议手动输入",
-                     font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=20)
+        ctk.CTkButton(card3, text="📍 自动定位", fg_color="#555", width=120,
+                      command=lambda: self._auto_locate(loc_info)).pack(anchor="w", padx=12, pady=(5, 2))
+        ctk.CTkLabel(card3, text="💡 自动定位基于网络 IP，可能有偏差",
+                     font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=12)
 
-        search_frame = ctk.CTkFrame(dlg, fg_color="transparent")
-        search_frame.pack(fill="x", padx=20, pady=(5, 0))
-        city_entry = ctk.CTkEntry(search_frame, width=230, placeholder_text="输入城市/镇/村名搜索")
+        search_frame = ctk.CTkFrame(card3, fg_color="transparent")
+        search_frame.pack(fill="x", padx=12, pady=(5, 0))
+        city_entry = ctk.CTkEntry(search_frame, width=210, placeholder_text="输入城市/镇/村名搜索")
         city_entry.pack(side="left")
 
         def do_search():
@@ -287,7 +345,7 @@ class App(ctk.CTk):
             if not results:
                 messagebox.showinfo("未找到", f"未找到 '{query}'，请尝试其他关键词")
                 return
-            pick_dlg = Toplevel(dlg)
+            pick_dlg = ctk.CTkToplevel(dlg)
             pick_dlg.title("🔍 选择城市")
             pick_dlg.geometry("440x400")
             pick_dlg.transient(dlg)
@@ -324,7 +382,7 @@ class App(ctk.CTk):
         search_btn = ctk.CTkButton(search_frame, text="🔍 搜索", width=70, command=do_search)
         search_btn.pack(side="left", padx=5)
 
-        ctk.CTkLabel(dlg, text="💡 可直接搜索你所在的位置",
+        ctk.CTkLabel(card3, text="💡 可直接搜索你所在的位置",
                      font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=20, pady=(2, 0))
 
         def save_settings():
@@ -339,9 +397,12 @@ class App(ctk.CTk):
                 enable_autostart()
             else:
                 disable_autostart()
+            mode_map = {"跟随系统": "system", "亮色": "light", "暗色": "dark"}
+            _cfg.config["appearance_mode"] = mode_map.get(theme_combo.get(), "system")
+            ctk.set_appearance_mode(_cfg.config["appearance_mode"])
             self._weather_card_label.configure(text=f"🌤️ {_cfg.LOCATION['name']}天气")
             self._ctrl_card_label.configure(text=f"🎮 {_cfg.config['brand']}空调控制")
-            self._refresh_weather()
+            self._render_weather()
             dlg.destroy()
             self.send_status.configure(text="✅ 设置已保存", text_color="#27AE60")
             self.after(2000, lambda: self.send_status.configure(text=""))
@@ -394,8 +455,15 @@ class App(ctk.CTk):
         self.wx_info.pack()
         self.wx_obs = ctk.CTkLabel(weather_card, text="", font=ctk.CTkFont(size=10), text_color="gray")
         self.wx_obs.pack(pady=(0, 5))
+
+        # API 未配置时的帮助链接
+        self.wx_link = ctk.CTkLabel(weather_card, text="", font=ctk.CTkFont(size=11),
+                                     text_color=["#2E86C1", "#5DADE2"], cursor="hand2")
+        self.wx_link.pack(pady=(0, 8))
+        self.wx_link.pack_forget()
+        self.wx_link.bind("<Button-1>", lambda e: webbrowser.open("https://console.qweather.com"))
         ctk.CTkButton(weather_card, text="🔄 刷新天气", fg_color="#4A90D9",
-                      command=self._auto_wx_refresh).pack(pady=(5, 10))
+                      command=self._fetch_weather_all).pack(pady=(5, 10))
 
         # 右上: 控制
         ctrl_card = ctk.CTkFrame(grid_frame)
@@ -575,7 +643,7 @@ class App(ctk.CTk):
             self.off_status.configure(text="⏸️ 关机定时已关闭", text_color="gray")
 
     def _edit_rules(self):
-        dlg = Toplevel(self)
+        dlg = ctk.CTkToplevel(self)
         dlg.title("✏️ 编辑温度规则")
         dlg.geometry("450x400")
         dlg.transient(self)
@@ -641,6 +709,7 @@ class App(ctk.CTk):
 
         # ── 左列: 台风 ──
         left = ctk.CTkFrame(grid)
+        left.configure(border_width=1, border_color="#4A4A4A", corner_radius=8)
         left.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
         ctk.CTkLabel(left, text="🌀 西北太平洋台风", font=ctk.CTkFont(size=13, weight="bold")).pack(
@@ -648,16 +717,27 @@ class App(ctk.CTk):
         ctk.CTkLabel(left, text="数据: 中央气象台", font=ctk.CTkFont(size=10), text_color="gray").pack(
             anchor="w", padx=10)
 
-        self.ty_list = ctk.CTkScrollableFrame(left, height=280)
-        self.ty_list.pack(fill="both", expand=True, padx=8, pady=5)
-        ctk.CTkLabel(self.ty_list, text="点击 [刷新数据] 获取台风信息",
+        self.ty_frame = ctk.CTkFrame(left, fg_color="transparent")
+        self.ty_frame.pack(fill="both", expand=True, padx=8, pady=5)
+        ctk.CTkLabel(self.ty_frame, text="点击 [刷新数据] 获取台风信息",
                      font=ctk.CTkFont(size=12), text_color="gray").pack(pady=20)
 
+        # 台风翻页
+        self._ty_page = 0
+        ty_nav = ctk.CTkFrame(left, fg_color="transparent")
+        ty_nav.pack(fill="x", padx=8, pady=(0, 2))
+        self._ty_page_prev = ctk.CTkButton(ty_nav, text="← 上一页", width=65, fg_color="#555",
+                                            command=self._ty_prev_page)
+        self._ty_page_label = ctk.CTkLabel(ty_nav, text="", font=ctk.CTkFont(size=10), text_color="gray")
+        self._ty_page_next = ctk.CTkButton(ty_nav, text="下一页 →", width=65, fg_color="#555",
+                                            command=self._ty_next_page)
+
         ctk.CTkButton(left, text="🔄 刷新台风", fg_color="#4A90D9", height=26,
-                      command=self._refresh_typhoon).pack(pady=(0, 8))
+                      command=self._fetch_typhoon_all).pack(pady=(2, 8))
 
         # ── 右列: 当地预警 ──
         right = ctk.CTkFrame(grid)
+        right.configure(border_width=1, border_color="#4A4A4A", corner_radius=8)
         right.grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
 
         ctk.CTkLabel(right, text="🌤️ 当地天气预警", font=ctk.CTkFont(size=13, weight="bold")).pack(
@@ -665,13 +745,23 @@ class App(ctk.CTk):
         ctk.CTkLabel(right, text="数据: 和风天气", font=ctk.CTkFont(size=10), text_color="gray").pack(
             anchor="w", padx=10)
 
-        self.alert_list = ctk.CTkScrollableFrame(right, height=280)
-        self.alert_list.pack(fill="both", expand=True, padx=8, pady=5)
-        ctk.CTkLabel(self.alert_list, text="点击 [刷新预警] 获取当地预警",
+        self.alert_frame = ctk.CTkFrame(right, fg_color="transparent")
+        self.alert_frame.pack(fill="both", expand=True, padx=8, pady=5)
+        ctk.CTkLabel(self.alert_frame, text="点击 [刷新预警] 获取当地预警",
                      font=ctk.CTkFont(size=12), text_color="gray").pack(pady=20)
 
+        # 预警翻页
+        self._alert_page = 0
+        alert_nav = ctk.CTkFrame(right, fg_color="transparent")
+        alert_nav.pack(fill="x", padx=8, pady=(0, 2))
+        self._alert_page_prev = ctk.CTkButton(alert_nav, text="← 上一页", width=65, fg_color="#555",
+                                               command=self._alert_prev_page)
+        self._alert_page_label = ctk.CTkLabel(alert_nav, text="", font=ctk.CTkFont(size=10), text_color="gray")
+        self._alert_page_next = ctk.CTkButton(alert_nav, text="下一页 →", width=65, fg_color="#555",
+                                               command=self._alert_next_page)
+
         ctk.CTkButton(right, text="🔄 刷新预警", fg_color="#E67E22", height=26,
-                      command=self._refresh_alerts).pack(pady=(0, 8))
+                      command=self._fetch_weather_all).pack(pady=(2, 8))
 
         # ── 底部: 共享设置栏 ──
         bot = ctk.CTkFrame(self.tab_ty, fg_color="transparent")
@@ -692,17 +782,77 @@ class App(ctk.CTk):
         self.ty_time_label = ctk.CTkLabel(bot, text="", font=ctk.CTkFont(size=11), text_color="gray")
         self.ty_time_label.pack(side="right", padx=10)
 
-    def _refresh_alerts(self):
-        """刷新当地天气预警"""
-        for w in self.alert_list.winfo_children():
-            w.destroy()
+    def _render_alerts(self):
+        """从缓存渲染预警面板（每页3条）"""
+        self._alert_page = 0
+        self._do_render_alerts()
 
-        alerts = fetch_weather_alerts()
+    def _do_render_alerts(self):
+        for w in self.alert_frame.winfo_children():
+            w.destroy()
+        alerts = self._alerts_data
         if not alerts:
-            ctk.CTkLabel(self.alert_list, text="✅ 暂无预警信息",
+            ctk.CTkLabel(self.alert_frame, text="✅ 暂无预警信息",
                          font=ctk.CTkFont(size=13), text_color="#27AE60").pack(pady=30)
-            self.tab_ty.update_idletasks()
+            self._alert_page_prev.pack_forget()
+            self._alert_page_next.pack_forget()
+            self._alert_page_label.pack_forget()
             return
+
+        PER_PAGE = 3
+        total = len(alerts)
+        total_pages = (total + PER_PAGE - 1) // PER_PAGE
+        start = self._alert_page * PER_PAGE
+        page_alerts = alerts[start:start + PER_PAGE]
+
+        # 排序
+        sev_order = {"extreme": 0, "severe": 1, "moderate": 2, "minor": 3}
+        alerts.sort(key=lambda a: sev_order.get(a.get("severity", ""), 99))
+
+        sev_cn = {"extreme": "红色", "severe": "橙色", "moderate": "黄色", "minor": "蓝色"}
+        sev_color = {"extreme": "#E74C3C", "severe": "#E67E22", "moderate": "#F1C40F", "minor": "#3498DB"}
+
+        for a in page_alerts:
+            sev = a.get("severity", "minor")
+            card = ctk.CTkFrame(self.alert_frame)
+            card.pack(fill="x", padx=3, pady=3, ipady=4)
+            title_row = ctk.CTkFrame(card, fg_color="transparent")
+            title_row.pack(fill="x", padx=8, pady=(4, 2))
+            sev_label = sev_cn.get(sev, sev)
+            color = sev_color.get(sev, "#888")
+            sev_icon = {"extreme": "🔴", "severe": "🟠", "moderate": "🟡", "minor": "🔵"}.get(sev, "⚪")
+            ctk.CTkLabel(title_row, text=f"{sev_icon} {sev_label}预警",
+                         text_color=color, font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+            ctk.CTkLabel(title_row, text=a.get("headline", ""),
+                         font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=6)
+            sender = a.get("senderName", "")
+            if sender:
+                ctk.CTkLabel(card, text=sender, font=ctk.CTkFont(size=10), text_color="gray").pack(
+                    anchor="w", padx=8)
+            desc = a.get("description", "")
+            if desc:
+                ctk.CTkLabel(card, text=desc[:120], wraplength=340, font=ctk.CTkFont(size=11),
+                             anchor="w", justify="left").pack(anchor="w", padx=8, pady=(2, 0))
+            eff = a.get("effectiveTime", "")[:16].replace("T", " ")
+            exp = a.get("expireTime", "")[:16].replace("T", " ")
+            if eff and exp:
+                ctk.CTkLabel(card, text=f"📅 {eff} → {exp}", font=ctk.CTkFont(size=10),
+                             text_color="gray").pack(anchor="w", padx=8, pady=(2, 4))
+
+        # 翻页按钮
+        if total_pages <= 1:
+            self._alert_page_prev.pack_forget()
+            self._alert_page_next.pack_forget()
+            self._alert_page_label.pack_forget()
+        else:
+            self._alert_page_prev.pack(side="left", padx=2)
+            self._alert_page_label.pack(side="left", padx=8)
+            self._alert_page_label.configure(text=f"第 {self._alert_page + 1}/{total_pages} 页")
+            self._alert_page_next.pack(side="left", padx=2)
+            self._alert_page_prev.configure(state="normal" if self._alert_page > 0 else "disabled")
+            self._alert_page_next.configure(
+                state="normal" if self._alert_page < total_pages - 1 else "disabled")
+        
 
         # 按严重程度排序: 红>橙>黄>蓝
         sev_order = {"extreme": 0, "severe": 1, "moderate": 2, "minor": 3}
@@ -713,7 +863,7 @@ class App(ctk.CTk):
 
         for a in alerts:
             sev = a.get("severity", "minor")
-            card = ctk.CTkFrame(self.alert_list)
+            card = ctk.CTkFrame(self.alert_frame)
             card.pack(fill="x", padx=3, pady=3, ipady=4)
 
             # 标题行: 颜色条 + 等级 + 标题
@@ -746,7 +896,24 @@ class App(ctk.CTk):
             if eff and exp:
                 ctk.CTkLabel(card, text=f"📅 {eff} → {exp}",
                              font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=8, pady=(2, 4))
-        self.tab_ty.update_idletasks()
+
+    def _ty_prev_page(self):
+        if self._ty_page > 0:
+            self._ty_page -= 1
+            self._do_render_typhoon()
+
+    def _ty_next_page(self):
+        self._ty_page += 1
+        self._do_render_typhoon()
+
+    def _alert_prev_page(self):
+        if self._alert_page > 0:
+            self._alert_page -= 1
+            self._do_render_alerts()
+
+    def _alert_next_page(self):
+        self._alert_page += 1
+        self._do_render_alerts()
 
     def _save_ty_settings(self):
         try:
@@ -772,29 +939,74 @@ class App(ctk.CTk):
         self.send_status.configure(text="🌍 卫星云图已在浏览器打开", text_color="#27AE60")
         self.after(2000, lambda: self.send_status.configure(text=""))
 
-    def _schedule_wx_refresh(self):
+    def _schedule_refresh(self):
+        """重置 10 分钟计时器"""
         WX_INTERVAL = 10 * 60 * 1000
         if self._wx_timer_id:
             self.after_cancel(self._wx_timer_id)
-        self._wx_timer_id = self.after(WX_INTERVAL, self._auto_wx_refresh)
+        self._wx_timer_id = self.after(WX_INTERVAL, self._auto_refresh)
 
-    def _auto_wx_refresh(self):
-        self._refresh_weather()
-        self._schedule_wx_refresh()
+    def _auto_refresh(self):
+        """10 分钟自动：获取全部 → 渲染全部 → 重设计时器"""
+        self._fetch_all()
+        self._render_all()
+        self._schedule_refresh()
 
-    def _refresh_weather(self):
-        w = fetch_weather()
+    def _fetch_all(self):
+        """获取全部数据（天气+预警+台风详情），写入缓存"""
+        self._weather_data = fetch_weather()
+        if self._weather_data:
+            _cfg._cached_temp = float(self._weather_data["temp"])
+        self._alerts_data = fetch_weather_alerts()
+        self._typhoons_data = []
+        for t in fetch_typhoons():
+            d = fetch_typhoon_detail(t["id"])
+            if d:
+                self._typhoons_data.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"], "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
+
+    def _fetch_weather_all(self):
+        """手动刷新天气+预警 → 渲染 → 重设计时器"""
+        self._weather_data = fetch_weather()
+        if self._weather_data:
+            _cfg._cached_temp = float(self._weather_data["temp"])
+        self._alerts_data = fetch_weather_alerts()
+        self._render_weather()
+        self._render_alerts()
+        self._schedule_refresh()
+
+    def _fetch_typhoon_all(self):
+        """手动刷新台风详情 → 渲染 → 重设计时器"""
+        self._typhoons_data = []
+        for t in fetch_typhoons():
+            d = fetch_typhoon_detail(t["id"])
+            if d:
+                self._typhoons_data.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"], "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
+        self._render_typhoon()
+        self._schedule_refresh()
+
+    def _render_all(self):
+        """从缓存渲染全部卡片"""
+        self._render_weather()
+        self._render_alerts()
+        self._render_typhoon()
+
+    def _render_weather(self):
+        """从缓存渲染天气卡片"""
+        w = self._weather_data
         if w:
-            _cfg._cached_temp = float(w["temp"])
+            self.wx_link.pack_forget()
             self.wx_temp.configure(text=f"{w['temp']}°C")
             info = f"{w['text']}  |  体感 {w['feelsLike']}°C  |  湿度 {w['humidity']}%  |  {w['windDir']} {w['windScale']}级"
             self.wx_info.configure(text=info)
             self.wx_obs.configure(text=f"观测时间: {w['obsTime']}")
             write_log("天气", f"{w['temp']}°C {w['text']} 湿度{w['humidity']}% {w['windDir']}{w['windScale']}级")
         else:
-            self.wx_info.configure(text="获取失败")
-        # 同时刷新预警信息（共用天气 API Host，省调用次数）
-        self._refresh_alerts()
+            self.wx_link.configure(
+                text="点击这里前往和风天气控制台 →",
+            )
+            self.wx_info.configure(text="无法获取天气")
+            self.wx_obs.configure(text="和风天气 API 免费申请，每月 50,000 次调用")
+            self.wx_link.pack(pady=(0, 8))
 
     def _on_send_click(self):
         self.send_status.configure(text="⏳ 发送中...", text_color="#E67E22")
@@ -821,7 +1033,7 @@ class App(ctk.CTk):
             self._repair_dialog()
 
     def _repair_dialog(self):
-        dlg = Toplevel(self)
+        dlg = ctk.CTkToplevel(self)
         dlg.title("🔧 故障诊断")
         dlg.geometry("520x460")
         dlg.transient(self)
@@ -1019,31 +1231,41 @@ class App(ctk.CTk):
             write_log("系统", f"手动触发失败: {e}")
         self.after(3000, lambda: self.send_status.configure(text=""))
 
-    def _refresh_typhoon(self):
-        for w in self.ty_list.winfo_children():
-            w.destroy()
+    def _render_typhoon(self):
+        """从缓存渲染台风面板（每页2条）"""
+        self._ty_page = 0
+        self._do_render_typhoon()
 
-        typhoons = fetch_typhoons()
+    def _do_render_typhoon(self):
+        for w in self.ty_frame.winfo_children():
+            w.destroy()
+        typhoons = self._typhoons_data
         if not typhoons:
-            ctk.CTkLabel(self.ty_list, text="西北太平洋当前无活跃台风 ✅",
+            ctk.CTkLabel(self.ty_frame, text="西北太平洋当前无活跃台风 ✅",
                          font=ctk.CTkFont(size=14)).pack(pady=30)
             self.ty_time_label.configure(text=f"上次更新: {datetime.now():%H:%M}")
-            self.tab_ty.update_idletasks()
+            self._ty_page_prev.pack_forget()
+            self._ty_page_next.pack_forget()
+            self._ty_page_label.pack_forget()
             return
 
-        for t in typhoons:
-            detail = fetch_typhoon_detail(t["id"])
+        PER_PAGE = 2
+        total = len(typhoons)
+        total_pages = (total + PER_PAGE - 1) // PER_PAGE
+        start = self._ty_page * PER_PAGE
+        page_typhoons = typhoons[start:start + PER_PAGE]
+
+        for t in page_typhoons:
+            detail = t.get("detail")
             if not detail:
                 continue
-
             dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"], detail["lat"], detail["lon"])
             alert = dist < _cfg.config.get("typhoon_alert_km", 800)
             status = "⚠️ 预警" if alert else "✅ 安全"
             status_color = "#E74C3C" if alert else "#27AE60"
 
-            card = ctk.CTkFrame(self.ty_list)
+            card = ctk.CTkFrame(self.ty_frame)
             card.pack(fill="x", padx=5, pady=5, ipady=5)
-
             title_row = ctk.CTkFrame(card, fg_color="transparent")
             title_row.pack(fill="x", padx=10, pady=(5, 3))
             ctk.CTkLabel(title_row, text=f"🌀 {detail['cn']}  {detail['eng']}",
@@ -1052,7 +1274,6 @@ class App(ctk.CTk):
                          font=ctk.CTkFont(size=12), text_color="gray").pack(side="left", padx=8)
             ctk.CTkLabel(title_row, text=status, text_color=status_color,
                          font=ctk.CTkFont(size=12, weight="bold")).pack(side="right")
-
             d1 = ctk.CTkFrame(card, fg_color="transparent")
             d1.pack(fill="x", padx=10)
             ctk.CTkLabel(d1, text=f"等级: {detail['cat']}  |  气压: {detail['pressure']}hPa  |  "
@@ -1060,7 +1281,6 @@ class App(ctk.CTk):
             ctk.CTkLabel(d1, text=f"位置: {detail['lat']}°N, {detail['lon']}°E  |  "
                                   f"移向: {detail['direction']}  |  移速: {detail['speed']}km/h").pack(anchor="center")
             ctk.CTkLabel(d1, text=f"距{_cfg.LOCATION['name']}: {dist}km").pack(anchor="center")
-
             if detail["forecasts"]:
                 d2 = ctk.CTkFrame(card, fg_color="transparent")
                 d2.pack(fill="x", padx=10, pady=(3, 8))
@@ -1069,15 +1289,28 @@ class App(ctk.CTk):
                     ctk.CTkLabel(d2, text=f"  +{fc['hours']}h → {fc['lat']}°N, {fc['lon']}°E  "
                                           f"{fc['pressure']}hPa  {fc['wind']}m/s  {fc['cat']}",
                                  font=ctk.CTkFont(size=11)).pack(anchor="center")
-
             self.ty_time_label.configure(text=f"更新时间: {detail['update_time']}")
-
             if alert and _cfg.config.get("typhoon_alert_enabled", True):
                 messagebox.showwarning("台风预警",
                                        f"{detail['cn']} ({detail['cat']})\n"
                                        f"距{_cfg.LOCATION['name']}仅 {dist}km\n请关注中央气象台最新预报")
-
             write_log("台风", f"{detail['cn']} {detail['cat']} {detail['lat']}N,{detail['lon']}E 距{dist}km {status}")
 
         self.ty_time_label.configure(text=f"上次更新: {datetime.now():%H:%M}")
-        self.tab_ty.update_idletasks()
+
+        # 翻页按钮
+        if total_pages <= 1:
+            self._ty_page_prev.pack_forget()
+            self._ty_page_next.pack_forget()
+            self._ty_page_label.pack_forget()
+        else:
+            self._ty_page_prev.pack(side="left", padx=2)
+            self._ty_page_label.pack(side="left", padx=8)
+            self._ty_page_label.configure(text=f"第 {self._ty_page + 1}/{total_pages} 页")
+            self._ty_page_next.pack(side="left", padx=2)
+            self._ty_page_prev.configure(state="normal" if self._ty_page > 0 else "disabled")
+            self._ty_page_next.configure(
+                state="normal" if self._ty_page < total_pages - 1 else "disabled")
+        
+
+

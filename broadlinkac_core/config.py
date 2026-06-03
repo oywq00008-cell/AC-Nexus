@@ -55,6 +55,7 @@ def load_config():
         "off_time": "22:00",
         "off_enabled": False,
         "auto_adjust": True,
+        "appearance_mode": "system",
     }
 
 
