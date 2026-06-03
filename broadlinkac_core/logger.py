@@ -68,6 +68,6 @@ def get_last_ac_state():
                 mode = _LOG_MODES.get(m.group(1), "cool")
                 temp = int(m.group(2))
             return {"power": "on", "mode": mode, "temp": temp}
-        if "关机" in line:
+        if re.search(r"(\]\s*关机|定时关机:|已关机)", line):
             return {"power": "off", "mode": "cool", "temp": 26}
     return {"power": "off", "mode": "cool", "temp": 26}
