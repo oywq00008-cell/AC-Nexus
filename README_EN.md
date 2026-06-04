@@ -52,8 +52,8 @@ send_ac("off", "cool", 26, "auto")  # Turn off
 
 | Platform | Download |
 |----------|----------|
-| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases/latest) |
-| Windows | [BroadlinkAC-Windows.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases/latest) |
+| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
+| Windows | [BroadlinkAC-Windows.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
 
 On macOS, if Gatekeeper blocks:
 ```bash
@@ -63,7 +63,7 @@ xattr -cr /Applications/BroadlinkAC.app
 ### Option 2: Run from source
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
 cd BroadlinkAC
 pip install -r requirements.txt
 python3 ac_controller.py
@@ -72,8 +72,8 @@ python3 ac_controller.py
 ### Option 3: Agent / Headless (Linux / Raspberry Pi / Server)
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
-cd BroadlinkAC-For-AI-Agent
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
+cd BroadlinkAC-For-Agent
 pip install -r requirements-core.txt
 ```
 

@@ -53,8 +53,8 @@ send_ac("off", "cool", 26, "auto")  # 关机
 
 | 平台 | 下载 |
 |------|------|
-| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases/latest) |
-| Windows | [BroadlinkAC-Windows.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent/releases/latest) |
+| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
+| Windows | [BroadlinkAC-Windows.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
 
 macOS 首次提示「无法验证开发者」：
 ```bash
@@ -64,7 +64,7 @@ xattr -cr /Applications/BroadlinkAC.app
 ### 方式二：从源码运行
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
 cd BroadlinkAC
 pip install -r requirements.txt
 python3 ac_controller.py
@@ -73,8 +73,8 @@ python3 ac_controller.py
 ### 方式三：Agent / 无头模式（Linux / 树莓派 / 服务器）
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
-cd BroadlinkAC-For-AI-Agent
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
+cd BroadlinkAC-For-Agent
 pip install -r requirements-core.txt
 ```
 
