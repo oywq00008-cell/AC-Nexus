@@ -31,8 +31,14 @@ def fetch_typhoons():
         active = []
         for t in data.get("typhoonList", []):
             if t[7] == "start":
+                cn = t[2]
+                eng = t[1]
+                if cn == "nameless":
+                    cn = "尚未编号"
+                if eng == "nameless":
+                    eng = "尚未编号"
                 active.append({
-                    "id": t[0], "eng": t[1], "cn": t[2],
+                    "id": t[0], "eng": eng, "cn": cn,
                     "code": str(t[3]), "meaning": t[6] or ""
                 })
         return active
@@ -73,8 +79,15 @@ def fetch_typhoon_detail(ty_id):
             return {"TD": "热带低压", "TS": "热带风暴", "STS": "强热带风暴",
                     "TY": "台风", "STY": "强台风", "SuperTY": "超强台风"}.get(c, c)
 
+        cn = t[2]
+        eng = t[1]
+        if cn == "nameless":
+            cn = "尚未编号"
+        if eng == "nameless":
+            eng = "尚未编号"
+
         return {
-            "cn": t[2], "eng": t[1], "code": str(t[3]),
+            "cn": cn, "eng": eng, "code": str(t[3]),
             "cat": cat_name(latest[3]),
             "lon": latest[4], "lat": latest[5],
             "pressure": latest[6], "wind": latest[7],
