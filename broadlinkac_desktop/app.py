@@ -225,11 +225,13 @@ class App(ctk.CTk):
         self._ctrl_card_label.configure(text=f"🎮 {brand_cn}空调控制")
 
     def _center_on_parent(self, child, width, height):
-        """将弹窗居中于主窗口"""
+        """将弹窗居中于主窗口（先隐藏定位后再显示，避免闪烁）"""
+        child.withdraw()
         child.update_idletasks()
         x = self.winfo_rootx() + (self.winfo_width() - width) // 2
         y = self.winfo_rooty() + (self.winfo_height() - height) // 2
         child.geometry(f"{width}x{height}+{x}+{y}")
+        child.deiconify()
 
     def _show_about(self):
         """自定义 About 弹窗，支持可点击链接"""

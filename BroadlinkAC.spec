@@ -1,16 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+
 a = Analysis(
     ['ac_controller.py'],
     pathex=[],
     binaries=[],
-    datas=[('protocols', 'protocols'), ('broadlink.ico', '.'), ('broadlink.png', '.'), ('使用文档.md', '.'), ('logos', 'logos')],
-    hiddenimports=[
-        'protocols.haier', 'protocols.aux_ac', 'protocols.panasonic',
-        'hvac_ir.gree', 'hvac_ir.midea', 'hvac_ir.hisense',
-        'hvac_ir.daikin', 'hvac_ir.mitsubishi',
-        'pystray', 'PIL',
-    ],
+    datas=[('protocols', 'protocols'), ('logos', 'logos'), ('使用文档.md', '.')],
+    hiddenimports=['protocols.haier', 'protocols.aux_ac', 'protocols.panasonic', 'hvac_ir.gree', 'hvac_ir.midea', 'hvac_ir.hisense', 'hvac_ir.daikin', 'hvac_ir.mitsubishi'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -23,9 +19,8 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='BroadlinkAC',
     debug=False,
     bootloader_ignore_signals=False,
@@ -37,5 +32,20 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='broadlink.ico',
+    icon=['/tmp/broadlink.icns'],
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='BroadlinkAC',
+)
+app = BUNDLE(
+    coll,
+    name='BroadlinkAC.app',
+    icon='/tmp/broadlink.icns',
+    bundle_identifier='com.local.broadlinkac',
 )
