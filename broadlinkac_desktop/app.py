@@ -12,6 +12,8 @@ import customtkinter as ctk
 from tkinter import Menu, Toplevel, messagebox
 from tkcalendar import Calendar
 import webbrowser
+from PIL import Image
+import pystray
 
 import broadlinkac_core.config as _cfg
 
@@ -112,6 +114,9 @@ class App(ctk.CTk):
         self.after(100, self._render_all)
         self.after(200, self._schedule_refresh)
 
+        self._setup_tray()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
     # ── 菜单栏 ──
     def _build_menu(self):
         menubar = Menu(self)
@@ -155,11 +160,55 @@ class App(ctk.CTk):
         about_btn = ctk.CTkButton(bar, text="About", command=self._show_about, **btn_opts)
         about_btn.pack(side="right", padx=2)
 
+    # ── Windows 托盘 ──
+    def _get_asset(self, filename):
+        """获取资源文件路径，兼容源码运行和 PyInstaller 打包"""
+        if getattr(sys, 'frozen', False):
+            return Path(sys._MEIPASS) / filename
+        return Path(__file__).resolve().parent.parent / filename
+
+    def _setup_tray(self):
+        """创建系统托盘图标（Windows 隐藏到任务栏）"""
+        if IS_MAC:
+            return
+        img = Image.open(self._get_asset("broadlink.png"))
+        menu = pystray.Menu(
+            pystray.MenuItem("显示", self._restore_from_tray, default=True),
+            pystray.MenuItem("退出", self._quit_from_tray),
+        )
+        self._tray = pystray.Icon(APP_NAME, img, APP_NAME, menu)
+        threading.Thread(target=self._tray.run, daemon=True).start()
+
+    def _on_close(self):
+        """点 X：Mac 退出，Windows 最小化到托盘"""
+        if IS_MAC:
+            self.quit()
+        else:
+            self.withdraw()
+
+    def _restore_from_tray(self):
+        """从托盘恢复窗口"""
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+
+    def _quit_from_tray(self):
+        """托盘菜单退出"""
+        self._tray.stop()
+        self.quit()
+
+    def _center_on_parent(self, child, width, height):
+        """将弹窗居中于主窗口"""
+        child.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width() - width) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - height) // 2
+        child.geometry(f"{width}x{height}+{x}+{y}")
+
     def _show_about(self):
         """自定义 About 弹窗，支持可点击链接"""
         dlg = ctk.CTkToplevel(self)
         dlg.title("About BroadlinkAC")
-        dlg.geometry("380x290")
+        self._center_on_parent(dlg, 380, 290)
         dlg.transient(self)
         dlg.grab_set()
 
@@ -191,7 +240,7 @@ class App(ctk.CTk):
 
         dlg = ctk.CTkToplevel(self)
         dlg.title("📅 选择日期")
-        dlg.geometry("300x320")
+        self._center_on_parent(dlg, 300, 320)
         dlg.resizable(False, False)
         dlg.transient(self)
         dlg.grab_set()
@@ -250,7 +299,7 @@ class App(ctk.CTk):
     def _open_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("⚙️ 设置")
-        dlg.geometry("500x680")
+        self._center_on_parent(dlg, 500, 680)
         dlg.transient(self)
         dlg.grab_set()
 
@@ -348,7 +397,7 @@ class App(ctk.CTk):
                 return
             pick_dlg = ctk.CTkToplevel(dlg)
             pick_dlg.title("🔍 选择城市")
-            pick_dlg.geometry("440x400")
+            self._center_on_parent(pick_dlg, 440, 400)
             pick_dlg.transient(dlg)
             pick_dlg.grab_set()
             ctk.CTkLabel(pick_dlg, text=f"搜索 '{query}' 找到 {len(results)} 个结果:",
@@ -646,7 +695,7 @@ class App(ctk.CTk):
     def _edit_rules(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("✏️ 编辑温度规则")
-        dlg.geometry("450x400")
+        self._center_on_parent(dlg, 450, 400)
         dlg.transient(self)
         dlg.grab_set()
 
@@ -1036,7 +1085,7 @@ class App(ctk.CTk):
     def _repair_dialog(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("🔧 故障诊断")
-        dlg.geometry("520x460")
+        self._center_on_parent(dlg, 520, 460)
         dlg.transient(self)
 
         ctk.CTkLabel(dlg, text="🔧 故障诊断", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(15, 5))
