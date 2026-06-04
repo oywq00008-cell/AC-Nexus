@@ -109,7 +109,8 @@ class App(ctk.CTk):
 
         self._wx_timer_id = None
         self._fetch_all()
-        self.after(800, self._render_all)
+        self.after(100, self._render_all)
+        self.after(200, self._schedule_refresh)
 
     # ── 菜单栏 ──
     def _build_menu(self):
