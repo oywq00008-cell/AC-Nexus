@@ -4,7 +4,7 @@ a = Analysis(
     ['ac_controller.py'],
     pathex=[],
     binaries=[],
-    datas=[('protocols', 'protocols'), ('broadlink.ico', '.'), ('broadlink.png', '.')],
+    datas=[('protocols', 'protocols'), ('broadlink.ico', '.'), ('broadlink.png', '.'), ('使用文档.md', '.')],
     hiddenimports=[
         'protocols.haier', 'protocols.aux_ac', 'protocols.panasonic',
         'hvac_ir.gree', 'hvac_ir.midea', 'hvac_ir.hisense',

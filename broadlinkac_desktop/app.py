@@ -134,6 +134,8 @@ class App(ctk.CTk):
         menubar.add_cascade(label="设置", menu=settings_menu)
 
         help_menu = Menu(menubar, tearoff=0)
+        help_menu.add_command(label="使用文档", command=self._open_docs)
+        help_menu.add_separator()
         help_menu.add_command(label="About BroadlinkAC", command=lambda: messagebox.showinfo(
             "About",
             "BroadlinkAC\n\n"
@@ -155,6 +157,7 @@ class App(ctk.CTk):
         btn_opts = dict(width=60, fg_color="transparent",
                         text_color=["#1a1a1a", "#dce4f0"])
         ctk.CTkButton(bar, text="⚙️ 设置", command=self._open_settings, **btn_opts).pack(side="left", padx=2)
+        ctk.CTkButton(bar, text="📖 文档", command=self._open_docs, **btn_opts).pack(side="left", padx=2)
         ctk.CTkButton(bar, text="📜 日志", command=self._open_log_dialog, **btn_opts).pack(side="left", padx=2)
         ctk.CTkButton(bar, text="🔧 诊断", command=self._repair_dialog, **btn_opts).pack(side="left", padx=2)
         about_btn = ctk.CTkButton(bar, text="About", command=self._show_about, **btn_opts)
@@ -231,6 +234,15 @@ class App(ctk.CTk):
             "https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent"))
 
         ctk.CTkButton(dlg, text="关闭", width=80, command=dlg.destroy).pack(pady=(15, 0))
+
+    def _open_docs(self):
+        """用系统默认程序打开使用文档"""
+        import os, subprocess
+        path = self._get_asset("使用文档.md")
+        if platform.system() == "Windows":
+            os.startfile(path)
+        else:
+            subprocess.run(["open", str(path)])
 
     def _open_log_dialog(self):
         dates = get_log_dates()
