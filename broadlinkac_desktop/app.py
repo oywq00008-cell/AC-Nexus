@@ -23,7 +23,7 @@ from broadlinkac_core.config import (
 )
 from broadlinkac_core.ac_control import (
     MODES, FANS, MODE_KEYS,
-    load_device_cache, save_device_cache, send_ac, discover_devices,
+    load_device_cache, save_device_cache, send_ac, discover_devices, _get_local_ips,
 )
 from broadlinkac_core.weather import fetch_weather, city_lookup, fetch_weather_alerts
 from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, calc_distance
@@ -1098,43 +1098,53 @@ class App(ctk.CTk):
             lbl.pack(fill="x", pady=1)
             return lbl
 
+        def ui_add_line(text, color="#FFFFFF"):
+            """线程安全：将 add_line 投递到主线程"""
+            dlg.after(0, lambda t=text, c=color: add_line(t, c))
+
+        def ui_update():
+            """线程安全：刷新 UI"""
+            dlg.after(0, result_frame.update)
+
         def run_diagnosis():
+            diag_btn.configure(text="⏳ 诊断中...", state="disabled")
             for w in result_frame.winfo_children():
                 w.destroy()
+            threading.Thread(target=_do_diagnosis, daemon=True).start()
+
+        def _do_diagnosis():
             all_ok = True
 
-            add_line("┌─ Python 环境 ────────", "#888")
+            ui_add_line("┌─ Python 环境 ────────", "#888")
             ver = sys.version.split()[0]
-            add_line(f"│ ✅ Python {ver}", "#27AE60")
-            add_line(f"│    {sys.executable}", "#888")
-            add_line("└──────────────────────", "#888")
+            ui_add_line(f"│ ✅ Python {ver}", "#27AE60")
+            ui_add_line(f"│    {sys.executable}", "#888")
+            ui_add_line("└──────────────────────", "#888")
 
-            add_line("┌─ 依赖库 ─────────────", "#888")
+            ui_add_line("┌─ 依赖库 ─────────────", "#888")
             for pkg_name in ["broadlink", "hvac_ir", "customtkinter", "schedule", "tkcalendar"]:
                 try:
                     mod = __import__(pkg_name)
                     ver_str = getattr(mod, "__version__", "OK")
-                    add_line(f"│ ✅ {pkg_name} {ver_str}", "#27AE60")
+                    ui_add_line(f"│ ✅ {pkg_name} {ver_str}", "#27AE60")
                 except Exception:
-                    row = ctk.CTkFrame(result_frame, fg_color="transparent")
-                    row.pack(fill="x", pady=1)
-                    label = ctk.CTkLabel(row, text=f"│ ❌ {pkg_name} 未安装",
-                                         font=ctk.CTkFont(size=12), text_color="#E74C3C", anchor="center")
-                    label.pack(side="left")
-
-                    def make_fix_btn(pkg, r, lbl, nm):
-                        return lambda: fix_pip(pkg, r, lbl, nm)
-
-                    ctk.CTkButton(row, text="📦 安装", width=60, height=22,
-                                  font=ctk.CTkFont(size=10), fg_color="#E67E22",
-                                  command=make_fix_btn(pkg_name, row, label, pkg_name)
-                                  ).pack(side="right", padx=(10, 0))
+                    def _show_missing_pkg(p):
+                        row = ctk.CTkFrame(result_frame, fg_color="transparent")
+                        row.pack(fill="x", pady=1)
+                        label = ctk.CTkLabel(row, text=f"│ ❌ {p} 未安装",
+                                             font=ctk.CTkFont(size=12), text_color="#E74C3C", anchor="center")
+                        label.pack(side="left")
+                        ctk.CTkButton(row, text="📦 安装", width=60, height=22,
+                                      font=ctk.CTkFont(size=10), fg_color="#E67E22",
+                                      command=lambda pkg=p, r=row, lbl=label: fix_pip(pkg, r, lbl, pkg)
+                                      ).pack(side="right", padx=(10, 0))
+                    dlg.after(0, _show_missing_pkg, pkg_name)
                     all_ok = False
-            add_line("└──────────────────────", "#888")
+            ui_add_line("└──────────────────────", "#888")
 
-            add_line("┌─ 博联设备扫描 ───────", "#888")
-            add_line("│ 🔍 扫描局域网...", "#E67E22")
-            result_frame.update()
+            ui_add_line("┌─ 博联设备扫描 ───────", "#888")
+            ui_add_line("│ 🔍 扫描局域网...", "#E67E22")
+            ui_update()
             device_found = True
 
             old_cache = load_device_cache()
@@ -1146,51 +1156,139 @@ class App(ctk.CTk):
                     d = devices[0]
                     new_ip = d.host[0]
                     ip_changed = old_ip and new_ip != old_ip
-                    add_line(f"│ ✅ {d.model} ({d.name})", "#27AE60")
-                    add_line(f"│    IP: {new_ip}:{d.host[1]}", "#AAA")
+                    ui_add_line(f"│ ✅ {d.model} ({d.name})", "#27AE60")
+                    ui_add_line(f"│    IP: {new_ip}:{d.host[1]}", "#AAA")
                     mac_hex = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
-                    add_line(f"│    MAC: {mac_hex}", "#AAA")
+                    ui_add_line(f"│    MAC: {mac_hex}", "#AAA")
                     if ip_changed:
-                        add_line(f"│    ⚠️ IP 已变更: {old_ip} → {new_ip}", "#E67E22")
+                        ui_add_line(f"│    ⚠️ IP 已变更: {old_ip} → {new_ip}", "#E67E22")
                     try:
                         d.auth()
-                        add_line("│    认证: ✅ 通过", "#27AE60")
+                        ui_add_line("│    认证: ✅ 通过", "#27AE60")
                         save_device_cache(d)
                         if ip_changed:
-                            add_line("│    📝 缓存已更新", "#27AE60")
+                            ui_add_line("│    📝 缓存已更新", "#27AE60")
                     except Exception as ae:
-                        add_line(f"│    认证: ❌ {ae}", "#E74C3C")
+                        ui_add_line(f"│    认证: ❌ {ae}", "#E74C3C")
                         device_found = False
                 else:
-                    dev_row = ctk.CTkFrame(result_frame, fg_color="transparent")
-                    dev_row.pack(fill="x", pady=1)
-                    ctk.CTkLabel(dev_row, text="│ ❌ 未发现设备",
-                                 font=ctk.CTkFont(size=12), text_color="#E74C3C").pack(side="left")
-                    ctk.CTkButton(dev_row, text="🔍 排查指南", width=80, height=22,
-                                  font=ctk.CTkFont(size=10), fg_color="#E67E22",
-                                  command=self._device_guide).pack(side="right", padx=(10, 0))
+                    def _show_no_device():
+                        dev_row = ctk.CTkFrame(result_frame, fg_color="transparent")
+                        dev_row.pack(fill="x", pady=1)
+                        ctk.CTkLabel(dev_row, text="│ ❌ 未发现设备",
+                                     font=ctk.CTkFont(size=12), text_color="#E74C3C").pack(side="left")
+                        ctk.CTkButton(dev_row, text="🔍 排查指南", width=80, height=22,
+                                      font=ctk.CTkFont(size=10), fg_color="#E67E22",
+                                      command=self._device_guide).pack(side="right", padx=(10, 0))
+                    dlg.after(0, _show_no_device)
                     device_found = False
             except Exception as de:
-                add_line(f"│ ❌ 扫描异常: {de}", "#E74C3C")
+                ui_add_line(f"│ ❌ 扫描异常: {de}", "#E74C3C")
                 device_found = False
             if not device_found:
                 all_ok = False
-            add_line("└──────────────────────", "#888")
+            ui_add_line("└──────────────────────", "#888")
 
-            add_line("┌─ 和风天气 API ───────", "#888")
-            w = fetch_weather()
-            if w:
-                add_line(f"│ ✅ {w['temp']}°C {w['text']} (观测 {w['obsTime']})", "#27AE60")
-            else:
-                add_line("│ ❌ API 无响应 (请检查网络连接)", "#E74C3C")
+            def _ping_host(host):
+                """ping 一次主机，返回 (success, response_time_ms 或 error_msg)"""
+                import subprocess
+                param = "-n" if platform.system() == "Windows" else "-c"
+                try:
+                    r = subprocess.run(["ping", param, "1", host],
+                                       capture_output=True, text=True, timeout=5)
+                    if r.returncode == 0:
+                        for line in r.stdout.split("\n"):
+                            if "time=" in line or "时间=" in line:
+                                return True, line.strip()
+                        return True, "OK"
+                    return False, "超时"
+                except Exception:
+                    return False, "异常"
+
+            def _run_network_diag():
+                """三层递进网络诊断，哪层断就停。返回是否网络正常"""
+                ui_add_line("│")
+                ui_add_line("│   ┌─ 网络诊断 ───────────", "#888")
+                net_ok = True
+
+                # 第一层：检测本机是否接入网络
+                ips = _get_local_ips()
+                if not ips:
+                    ui_add_line("│   │ ❌ 电脑未接入互联网", "#E74C3C")
+                    ui_add_line("│   │    → 请检查网线/WiFi 是否已连接", "#E67E22")
+                    net_ok = False
+                else:
+                    gateway = ".".join(ips[0].split(".")[:3] + ["1"])
+                    ui_add_line(f"│   │ 📶 本机 IP: {ips[0]}", "#AAA")
+
+                    # 第二层：测路由器连通性
+                    ok, msg = _ping_host(gateway)
+                    if not ok:
+                        ui_add_line(f"│   │ ❌ 网关 {gateway} 不通 ({msg})", "#E74C3C")
+                        ui_add_line("│   │    → 电脑与路由器连接有问题", "#E67E22")
+                        net_ok = False
+                    else:
+                        ui_add_line(f"│   │ ✅ 路由器 {gateway} 可达", "#27AE60")
+
+                        # 第三层：测外网连通性
+                        ok2, msg2 = _ping_host("baidu.com")
+                        if not ok2:
+                            ui_add_line(f"│   │ ❌ 外网 baidu.com 不通 ({msg2})", "#E74C3C")
+                            ui_add_line("│   │    → 电脑网络连接故障 (路由通但不出外网)", "#E67E22")
+                            net_ok = False
+                        else:
+                            ui_add_line("│   │ ✅ 外网 baidu.com 可达", "#27AE60")
+
+                if not net_ok:
+                    def _add_net_retry():
+                        row = ctk.CTkFrame(result_frame, fg_color="transparent")
+                        row.pack(fill="x", pady=1)
+                        ctk.CTkButton(row, text="🔍 重新检测网络", width=120, height=22,
+                                      font=ctk.CTkFont(size=10), fg_color="#E67E22",
+                                      command=lambda: threading.Thread(
+                                          target=_run_network_diag,
+                                          daemon=True).start()
+                                      ).pack(side="left", padx=28)
+                    dlg.after(0, _add_net_retry)
+
+                ui_add_line(f"│   └──────────────────────", "#888")
+                return net_ok
+
+            ui_add_line("┌─ 和风天气 API ───────", "#888")
+            _key = _cfg.QW_KEY
+            _host = _cfg.QW_HOST
+            if not _key or not _host:
+                ui_add_line(f"│ ❌ {'API Key' if not _key else 'Host'} 未填写", "#E74C3C")
+                def _open_qweather():
+                    def _btn():
+                        row = ctk.CTkFrame(result_frame, fg_color="transparent")
+                        row.pack(fill="x", pady=1)
+                        ctk.CTkButton(row, text="🔗 前往和风控制台", width=130, height=22,
+                                      font=ctk.CTkFont(size=10), fg_color="#4A90D9",
+                                      command=lambda: webbrowser.open("https://console.qweather.com")
+                                      ).pack(side="left", padx=8)
+                    dlg.after(0, _btn)
+                _open_qweather()
                 all_ok = False
-            add_line("└──────────────────────", "#888")
-
-            add_line("")
-            if all_ok:
-                add_line("📊 诊断结果: ✅ 全部正常", "#27AE60")
             else:
-                add_line("📊 诊断结果: ❌ 存在问题，请按上方按钮修复", "#E74C3C")
+                ui_add_line("│ ⏳ 检测网络连通性...", "#E67E22")
+                net_ok = _run_network_diag()
+                if net_ok:
+                    w = fetch_weather()
+                    if w:
+                        ui_add_line(f"│ ✅ {w['temp']}°C {w['text']} (观测 {w['obsTime']})", "#27AE60")
+                    else:
+                        ui_add_line("│ ❌ API 接口异常 (网络正常但服务无响应)", "#E74C3C")
+                        all_ok = False
+                else:
+                    all_ok = False
+
+            ui_add_line("└──────────────────────", "#888")
+
+            result = "📊 诊断结果: ✅ 全部正常" if all_ok else "📊 诊断结果: ❌ 存在问题，请按上方按钮修复"
+            ui_add_line("", "#888")
+            dlg.after(0, lambda: add_line(result, "#27AE60" if all_ok else "#E74C3C"))
+            dlg.after(0, lambda: diag_btn.configure(text="🔄 重新诊断", state="normal"))
 
         def fix_pip(pkg, row, label, name):
             import subprocess
@@ -1216,8 +1314,9 @@ class App(ctk.CTk):
 
         btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
         btn_frame.pack(pady=(8, 10))
-        ctk.CTkButton(btn_frame, text="🔄 重新检测", fg_color="#4A90D9",
-                      command=run_diagnosis).pack(side="left", padx=5)
+        diag_btn = ctk.CTkButton(btn_frame, text="🔄 重新检测", fg_color="#4A90D9",
+                      command=run_diagnosis)
+        diag_btn.pack(side="left", padx=5)
         ctk.CTkButton(btn_frame, text="关闭", fg_color="#666", command=dlg.destroy).pack(side="left", padx=5)
 
         run_diagnosis()
