@@ -224,6 +224,12 @@ class App(ctk.CTk):
             self.brand_logo_label.configure(image=None)
         self._ctrl_card_label.configure(text=f"🎮 {brand_cn}空调控制")
 
+    def _update_alert_source(self):
+        """更新预警面板数据源标识"""
+        src = "数据: 百度天气" if _cfg.config.get("weather_provider", "baidu") == "baidu" else "数据: 和风天气"
+        if hasattr(self, "_alert_source_label"):
+            self._alert_source_label.configure(text=src)
+
     def _center_on_parent(self, child, width, height):
         """将弹窗居中于主窗口（先隐藏定位后再显示，避免闪烁）"""
         child.withdraw()
@@ -343,27 +349,76 @@ class App(ctk.CTk):
 
         card_style = dict(border_width=1, border_color="#4A4A4A", corner_radius=8)
 
-        # ── 卡片1: 和风天气 ──
+        # ── 卡片1: 天气 API ──
         card1 = ctk.CTkFrame(dlg)
         card1.configure(**card_style)
         card1.pack(fill="x", padx=20, pady=(15, 8), ipady=5)
 
-        ctk.CTkLabel(card1, text="🌤️ 和风天气", font=ctk.CTkFont(size=13, weight="bold")).pack(
+        ctk.CTkLabel(card1, text="🌤️ 天气 API", font=ctk.CTkFont(size=13, weight="bold")).pack(
             anchor="w", padx=12, pady=(8, 2))
-        ctk.CTkLabel(card1, text="API Key", font=ctk.CTkFont(size=11), text_color="#888").pack(
-            anchor="w", padx=12, pady=(5, 0))
-        api_entry = ctk.CTkEntry(card1, width=400, show="*")
-        api_entry.insert(0, _cfg.QW_KEY)
-        api_entry.pack(padx=12, pady=(0, 5))
 
-        ctk.CTkLabel(card1, text="个人 Host", font=ctk.CTkFont(size=11), text_color="#888").pack(
-            anchor="w", padx=12, pady=(5, 0))
-        host_entry = ctk.CTkEntry(card1, width=400, placeholder_text="https://xxx.re.qweatherapi.com")
-        host_entry.insert(0, _cfg.QW_HOST)
-        host_entry.pack(padx=12)
-        ctk.CTkLabel(card1, text="💡 免费订阅需填入个人 Host 地址",
-                     font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=12, pady=(2, 8))
+        # 下拉 + 勾选互斥
+        def _on_provider_change(choice):
+            if choice == "百度API":
+                bd_frame.pack(fill="x", padx=12, pady=(5, 0))
+                qw_frame.pack_forget()
+            else:
+                qw_frame.pack(fill="x", padx=12, pady=(5, 0))
+                bd_frame.pack_forget()
 
+        sel_row = ctk.CTkFrame(card1, fg_color="transparent")
+        sel_row.pack(fill="x", padx=12, pady=(5, 2))
+        ctk.CTkLabel(sel_row, text="数据源:").pack(side="left")
+        provider_combo = ctk.CTkComboBox(sel_row, values=["百度API", "和风API"], width=100,
+                                          command=_on_provider_change)
+        provider_combo.set("百度API" if _cfg.config.get("weather_provider", "baidu") == "baidu" else "和风API")
+        provider_combo.pack(side="left", padx=8)
+
+        # 互斥勾选
+        bd_check = ctk.CTkCheckBox(sel_row, text="百度", command=lambda: _set_default("baidu"))
+        bd_check.pack(side="left", padx=5)
+        qw_check = ctk.CTkCheckBox(sel_row, text="和风", command=lambda: _set_default("qweather"))
+        qw_check.pack(side="left", padx=5)
+
+        cur = _cfg.config.get("weather_provider", "baidu")
+        if cur == "baidu":
+            bd_check.select()
+        else:
+            qw_check.select()
+
+        def _set_default(which):
+            if which == "baidu":
+                bd_check.select(); qw_check.deselect()
+            else:
+                qw_check.select(); bd_check.deselect()
+            self._update_alert_source()
+
+        # 百度输入区
+        bd_frame = ctk.CTkFrame(card1, fg_color="transparent")
+        bd_frame.pack(fill="x", padx=12, pady=(5, 0))
+        bd_entry = ctk.CTkEntry(bd_frame, width=400, show="*", placeholder_text="百度 API Key")
+        bd_entry.insert(0, _cfg.config.get("baidu_key", ""))
+        bd_entry.pack()
+        ctk.CTkLabel(bd_frame, text="💡 每天 5,000 次调用",
+                     font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", pady=(2, 0))
+
+        # 和风输入区
+        qw_frame = ctk.CTkFrame(card1, fg_color="transparent")
+        qw_frame.pack(fill="x", padx=12, pady=(5, 0))
+        qw_key_entry = ctk.CTkEntry(qw_frame, width=400, show="*", placeholder_text="和风 API Key")
+        qw_key_entry.insert(0, _cfg.QW_KEY)
+        qw_key_entry.pack()
+        qw_host_entry = ctk.CTkEntry(qw_frame, width=400, placeholder_text="https://xxx.re.qweatherapi.com")
+        qw_host_entry.insert(0, _cfg.QW_HOST)
+        qw_host_entry.pack(pady=(5, 0))
+        ctk.CTkLabel(qw_frame, text="💡 免费订阅需填入个人 Host 地址",
+                     font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", pady=(2, 8))
+
+        # 初始显隐
+        if _cfg.config.get("weather_provider", "baidu") == "baidu":
+            qw_frame.pack_forget()
+        else:
+            bd_frame.pack_forget()
         # ── 卡片2: 基础设置 ──
         card2 = ctk.CTkFrame(dlg)
         card2.configure(**card_style)
@@ -474,8 +529,15 @@ class App(ctk.CTk):
                      font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=20, pady=(2, 0))
 
         def save_settings():
-            _cfg.config["api_key"] = api_entry.get().strip()
-            _cfg.config["qw_host"] = host_entry.get().strip()
+            _cfg.config["api_key"] = qw_key_entry.get().strip()
+            _cfg.config["qw_host"] = qw_host_entry.get().strip()
+            _cfg.config["baidu_key"] = bd_entry.get().strip()
+            if bd_check.get():
+                _cfg.config["weather_provider"] = "baidu"
+            elif qw_check.get():
+                _cfg.config["weather_provider"] = "qweather"
+            else:
+                _cfg.config["weather_provider"] = "baidu"
             _cfg.config["brand"] = brand_combo.get()
             if hasattr(dlg, "_picked_loc"):
                 _cfg.config["location"] = dlg._picked_loc
@@ -491,12 +553,12 @@ class App(ctk.CTk):
             ctk.set_appearance_mode(_cfg.config["appearance_mode"])
             self._weather_card_label.configure(text=f"🌤️ {_cfg.LOCATION['name']}天气")
             self._ctrl_card_label.configure(text=f"🎮 {_cfg.config['brand']}空调控制")
+            self._update_alert_source()
             if hasattr(dlg, "_picked_loc"):
-                # 更换城市后自动刷新天气和台风数据
                 self.after(100, self._fetch_weather_all)
                 self.after(100, self._fetch_typhoon_all)
             else:
-                self._render_weather()
+                self._fetch_weather_all()
             dlg.destroy()
             self.send_status.configure(text="✅ 设置已保存", text_color="#27AE60")
             self.after(2000, lambda: self.send_status.configure(text=""))
@@ -551,7 +613,7 @@ class App(ctk.CTk):
         self.wx_obs.pack(pady=(0, 5))
 
         # API 未配置时的帮助链接
-        self.wx_link = ctk.CTkLabel(weather_card, text="", font=ctk.CTkFont(size=11),
+        self.wx_link = ctk.CTkLabel(weather_card, text="", font=ctk.CTkFont(size=14),
                                      text_color=["#2E86C1", "#5DADE2"], cursor="hand2")
         self.wx_link.pack(pady=(0, 8))
         self.wx_link.pack_forget()
@@ -864,8 +926,9 @@ class App(ctk.CTk):
                      font=ctk.CTkFont(size=15, weight="bold")).pack(side="left")
         ctk.CTkButton(alert_title_row, text="🔄 刷新", fg_color="#E67E22", height=24, width=70,
                       command=self._fetch_weather_all).pack(side="right")
-        ctk.CTkLabel(right, text="数据: 和风天气", font=ctk.CTkFont(size=12), text_color="gray").pack(
-            anchor="w", padx=10)
+        self._alert_source_label = ctk.CTkLabel(right, text="", font=ctk.CTkFont(size=12), text_color="gray")
+        self._alert_source_label.pack(anchor="w", padx=10)
+        self._update_alert_source()
 
         self.alert_frame = ctk.CTkFrame(right, fg_color="transparent")
         self.alert_frame.pack(fill="both", expand=True, padx=8, pady=5)
@@ -1087,11 +1150,21 @@ class App(ctk.CTk):
             self.wx_obs.configure(text=f"观测时间: {w['obsTime']}")
             write_log("天气", f"{w['temp']}°C {w['text']} 湿度{w['humidity']}% {w['windDir']}{w['windScale']}级")
         else:
-            self.wx_link.configure(
-                text="点击这里前往和风天气控制台 →",
-            )
+            provider = _cfg.config.get("weather_provider", "baidu")
+            if provider == "baidu":
+                wx_link_text = "点击这里前往百度地图控制台 →"
+                wx_link_url = "https://lbsyun.baidu.com/apiconsole/key"
+                wx_obs_text = "百度天气 API 每天 5,000 次免费调用"
+            else:
+                wx_link_text = "点击这里前往和风天气控制台 →"
+                wx_link_url = "https://console.qweather.com"
+                wx_obs_text = "和风天气 API 免费申请，每月 50,000 次调用"
+            self.wx_link.configure(text=wx_link_text)
+            self.wx_link.unbind("<Button-1>")
+            url = wx_link_url
+            self.wx_link.bind("<Button-1>", lambda e, u=url: webbrowser.open(u))
             self.wx_info.configure(text="无法获取天气")
-            self.wx_obs.configure(text="和风天气 API 免费申请，每月 50,000 次调用")
+            self.wx_obs.configure(text=wx_obs_text)
             self.wx_link.pack(pady=(0, 8))
 
     def _on_send_click(self):
