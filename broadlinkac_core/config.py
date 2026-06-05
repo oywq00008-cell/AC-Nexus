@@ -58,6 +58,7 @@ def load_config():
         "appearance_mode": "system",
         "baidu_key": "",
         "weather_provider": "baidu",
+        "weather_provider_set": False,
     }
 
 

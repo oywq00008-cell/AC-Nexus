@@ -108,6 +108,7 @@ class App(ctk.CTk):
         # 缓存
         self._weather_data = None
         self._alerts_data = []
+        self._alerts_provider = "baidu"
         self._typhoons_data = []
         self._ty_alert_muted = False  # 本次运行台风预警不再弹窗
 
@@ -225,8 +226,9 @@ class App(ctk.CTk):
         self._ctrl_card_label.configure(text=f"🎮 {brand_cn}空调控制")
 
     def _update_alert_source(self):
-        """更新预警面板数据源标识"""
-        src = "数据: 百度天气" if _cfg.config.get("weather_provider", "baidu") == "baidu" else "数据: 和风天气"
+        """更新预警面板数据源标识（以实际拉取源为准）"""
+        actual = getattr(self, "_alerts_provider", "baidu")
+        src = "数据: 百度天气" if actual == "baidu" else "数据: 和风天气"
         if hasattr(self, "_alert_source_label"):
             self._alert_source_label.configure(text=src)
 
@@ -374,10 +376,23 @@ class App(ctk.CTk):
         provider_combo.set("百度API" if _cfg.config.get("weather_provider", "baidu") == "baidu" else "和风API")
         provider_combo.pack(side="left", padx=8)
 
-        # 互斥勾选
-        bd_check = ctk.CTkCheckBox(sel_row, text="百度", command=lambda: _set_default("baidu"))
+        # 互斥勾选（可取消）— command 在 toggle 之后触发，get() 返回新状态
+        def _toggle_provider(which):
+            if which == "baidu":
+                if bd_check.get():
+                    bd_check.select(); qw_check.deselect()
+                else:
+                    bd_check.deselect(); qw_check.deselect()
+            else:
+                if qw_check.get():
+                    qw_check.select(); bd_check.deselect()
+                else:
+                    bd_check.deselect(); qw_check.deselect()
+            self._update_alert_source()
+
+        bd_check = ctk.CTkCheckBox(sel_row, text="百度", command=lambda: _toggle_provider("baidu"))
         bd_check.pack(side="left", padx=5)
-        qw_check = ctk.CTkCheckBox(sel_row, text="和风", command=lambda: _set_default("qweather"))
+        qw_check = ctk.CTkCheckBox(sel_row, text="和风", command=lambda: _toggle_provider("qweather"))
         qw_check.pack(side="left", padx=5)
 
         cur = _cfg.config.get("weather_provider", "baidu")
@@ -385,13 +400,6 @@ class App(ctk.CTk):
             bd_check.select()
         else:
             qw_check.select()
-
-        def _set_default(which):
-            if which == "baidu":
-                bd_check.select(); qw_check.deselect()
-            else:
-                qw_check.select(); bd_check.deselect()
-            self._update_alert_source()
 
         # 百度输入区
         bd_frame = ctk.CTkFrame(card1, fg_color="transparent")
@@ -529,15 +537,22 @@ class App(ctk.CTk):
                      font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w", padx=20, pady=(2, 0))
 
         def save_settings():
+            old_provider = _cfg.config.get("weather_provider", "baidu")
             _cfg.config["api_key"] = qw_key_entry.get().strip()
             _cfg.config["qw_host"] = qw_host_entry.get().strip()
             _cfg.config["baidu_key"] = bd_entry.get().strip()
             if bd_check.get():
                 _cfg.config["weather_provider"] = "baidu"
+                _cfg.config["weather_provider_set"] = True
             elif qw_check.get():
                 _cfg.config["weather_provider"] = "qweather"
+                _cfg.config["weather_provider_set"] = True
             else:
                 _cfg.config["weather_provider"] = "baidu"
+                _cfg.config["weather_provider_set"] = False
+            new_provider = _cfg.config["weather_provider"]
+            location_changed = hasattr(dlg, "_picked_loc")
+            provider_changed = old_provider != new_provider
             _cfg.config["brand"] = brand_combo.get()
             if hasattr(dlg, "_picked_loc"):
                 _cfg.config["location"] = dlg._picked_loc
@@ -554,11 +569,11 @@ class App(ctk.CTk):
             self._weather_card_label.configure(text=f"🌤️ {_cfg.LOCATION['name']}天气")
             self._ctrl_card_label.configure(text=f"🎮 {_cfg.config['brand']}空调控制")
             self._update_alert_source()
-            if hasattr(dlg, "_picked_loc"):
+            if location_changed:
                 self.after(100, self._fetch_weather_all)
                 self.after(100, self._fetch_typhoon_all)
-            else:
-                self._fetch_weather_all()
+            elif provider_changed:
+                self.after(100, self._fetch_weather_all)
             dlg.destroy()
             self.send_status.configure(text="✅ 设置已保存", text_color="#27AE60")
             self.after(2000, lambda: self.send_status.configure(text=""))
@@ -1102,7 +1117,7 @@ class App(ctk.CTk):
                 _cfg._cached_temp = float(self._weather_data["temp"])
             except (ValueError, TypeError, KeyError):
                 pass
-        self._alerts_data = fetch_weather_alerts()
+        self._alerts_data, self._alerts_provider = fetch_weather_alerts()
         self._typhoons_data = []
         for t in fetch_typhoons():
             d = fetch_typhoon_detail(t["id"])
@@ -1117,9 +1132,10 @@ class App(ctk.CTk):
                 _cfg._cached_temp = float(self._weather_data["temp"])
             except (ValueError, TypeError, KeyError):
                 pass
-        self._alerts_data = fetch_weather_alerts()
+        self._alerts_data, self._alerts_provider = fetch_weather_alerts()
         self._render_weather()
         self._render_alerts()
+        self._update_alert_source()
         self._schedule_refresh()
 
     def _fetch_typhoon_all(self):
@@ -1138,6 +1154,7 @@ class App(ctk.CTk):
         self._render_alerts()
         self._render_typhoon()
         self._update_brand_logo()
+        self._update_alert_source()
 
     def _render_weather(self):
         """从缓存渲染天气卡片"""

@@ -18,10 +18,14 @@ def _urlopen(url, timeout=8):
 
 
 def fetch_weather():
-    """获取实况天气（根据 provider 路由）"""
+    """获取实况天气（根据 provider 路由，未明确指定时降级）"""
     provider = _cfg.config.get("weather_provider", "baidu")
     if provider == "baidu":
-        return _fetch_weather_baidu()
+        result = _fetch_weather_baidu()
+        if result is not None or _cfg.config.get("weather_provider_set", False):
+            return result
+        # 未明确设置 → 回退和风
+        return _fetch_weather_qweather()
     return _fetch_weather_qweather()
 
 
@@ -45,11 +49,18 @@ def city_lookup(query: str):
 
 
 def fetch_weather_alerts():
-    """获取当地天气预警（根据 provider 路由）"""
+    """获取当地天气预警 → (数据列表, 实际数据源)
+    未明确指定时降级：百度无预警则回退和风。
+    """
     provider = _cfg.config.get("weather_provider", "baidu")
     if provider == "baidu":
-        return _fetch_weather_alerts_baidu()
-    return _fetch_weather_alerts_qweather()
+        result = _fetch_weather_alerts_baidu()
+        if result or _cfg.config.get("weather_provider_set", False):
+            return result, "baidu"
+        result = _fetch_weather_alerts_qweather()
+        return result, "qweather" if result else "baidu"
+    result = _fetch_weather_alerts_qweather()
+    return result, "qweather" if result else "baidu"
 
 
 def _fetch_weather_baidu():
