@@ -10,7 +10,7 @@ from pathlib import Path
 
 import customtkinter as ctk
 from customtkinter import CTkImage
-from tkinter import BooleanVar, Menu, Toplevel, messagebox
+from tkinter import BooleanVar, Canvas, Menu, Toplevel, messagebox
 from tkcalendar import Calendar
 import webbrowser
 from PIL import Image
@@ -1755,16 +1755,75 @@ class App(ctk.CTk):
             ctk.CTkLabel(d1, text=f"位置: {detail['lat']}°N, {detail['lon']}°E  |  "
                                   f"移向: {detail['direction']}  |  移速: {detail['speed']}km/h",
                          font=ctk.CTkFont(size=14)).pack(anchor="center")
-            ctk.CTkLabel(d1, text=f"距{_cfg.LOCATION['name']}: {dist}km",
+            dist_trend = ""
+            if detail["forecasts"]:
+                last_fc = detail["forecasts"][-1]
+                dist_far = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
+                                         last_fc["lat"], last_fc["lon"])
+                diff = dist_far - dist
+                if diff < -30:
+                    dist_trend = "  🔴 正在靠近"
+                elif diff > 30:
+                    dist_trend = "  🟢 正在远离"
+                else:
+                    dist_trend = "  ⚪ 徘徊"
+
+            ctk.CTkLabel(d1, text=f"距{_cfg.LOCATION['name']}: {dist}km{dist_trend}",
                          font=ctk.CTkFont(size=14)).pack(anchor="center")
             if detail["forecasts"]:
-                d2 = ctk.CTkFrame(card, fg_color="transparent")
-                d2.pack(fill="x", padx=10, pady=(3, 8))
-                ctk.CTkLabel(d2, text="路径预报:", font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="center")
+                # ── Canvas 路径预报图 ──
+                bg = "#2B2B2B" if ctk.get_appearance_mode() == "Dark" else "#F2F2F2"
+                cv = Canvas(card, height=110, bg=bg, highlightthickness=0, bd=0)
+                cv.pack(fill="x", padx=10, pady=(5, 8))
+
+                # 收集坐标点：预报路径 + 你家
+                fc_pts = [(detail["lat"], detail["lon"], "当前")]
                 for fc in detail["forecasts"][:4]:
-                    ctk.CTkLabel(d2, text=f"  +{fc['hours']}h → {fc['lat']}°N, {fc['lon']}°E  "
-                                          f"{fc['pressure']}hPa  {fc['wind']}m/s  {fc['cat']}",
-                                 font=ctk.CTkFont(size=13)).pack(anchor="center")
+                    fc_pts.append((fc["lat"], fc["lon"], f"+{fc['hours']}h"))
+
+                all_pts = fc_pts + [(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"], _cfg.LOCATION["name"])]
+                lats = [p[0] for p in all_pts]
+                lons = [p[1] for p in all_pts]
+                min_lat, max_lat = min(lats), max(lats)
+                min_lon, max_lon = min(lons), max(lons)
+                range_lat = max_lat - min_lat or 0.1
+                range_lon = max_lon - min_lon or 0.1
+
+                def geo2cv(lat, lon):
+                    x = 30 + (lon - min_lon) / range_lon * 280
+                    y = 10 + (max_lat - lat) / range_lat * 85
+                    return x, y
+
+                # 画预报路径连线
+                for i in range(len(fc_pts) - 1):
+                    cv.create_line(*geo2cv(fc_pts[i][0], fc_pts[i][1]),
+                                   *geo2cv(fc_pts[i+1][0], fc_pts[i+1][1]),
+                                   fill="#666", dash=(3, 3), width=1)
+
+                # 画当前 → 你家连线 + 距离标注
+                x0, y0 = geo2cv(detail["lat"], detail["lon"])
+                x1, y1 = geo2cv(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"])
+                cv.create_line(x0, y0, x1, y1, fill="#E67E22", width=1, dash=(2, 2))
+                mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+                cv.create_text(mx, my - 8, text=f"{dist}km", fill="#E67E22",
+                               font=("", 8))
+
+                # 画点 + 标注
+                for i, (lat, lon, label) in enumerate(fc_pts):
+                    x, y = geo2cv(lat, lon)
+                    if i == 0:
+                        cv.create_text(x, y, text="🌀", font=("", 12))
+                    else:
+                        r = 3
+                        cv.create_oval(x - r, y - r, x + r, y + r, fill="#888", outline="")
+                    cv.create_text(x, y - 11, text=label, fill="#999",
+                                   font=("", 8), anchor="s")
+
+                # 画你家
+                xh, yh = geo2cv(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"])
+                cv.create_oval(xh - 3, yh - 3, xh + 3, yh + 3, fill="#3498DB", outline="")
+                cv.create_text(xh, yh - 9, text=_cfg.LOCATION["name"], fill="#3498DB",
+                               font=("", 8), anchor="s")
             if alert and _cfg.config.get("typhoon_alert_enabled", True) and not self._ty_alert_muted:
                 self._show_ty_alert(detail, dist)
             write_log("台风", f"{detail['cn']} {detail['cat']} {detail['lat']}N,{detail['lon']}E 距{dist}km {status}")
