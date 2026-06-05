@@ -9,7 +9,7 @@
 """
 
 from broadlinkac_core.config import init, apply_config, save_config, load_config
-from broadlinkac_core.ac_control import send_ac, decide_ac, get_device, load_device_cache
+from broadlinkac_core.ac_control import send_ac, decide_ac, get_device
 from broadlinkac_core.weather import fetch_weather, city_lookup, fetch_weather_alerts
 from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, calc_distance
 from broadlinkac_core.logger import write_log, read_log, get_log_dates

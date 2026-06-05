@@ -43,18 +43,13 @@ def load_config():
     if CONFIG_FILE.exists():
         return json.loads(CONFIG_FILE.read_text())
     return {
-        "trigger_time": "12:00",
-        "schedule_enabled": True,
-        "temp_rules": [list(r) for r in DEFAULT_RULES],
+        "current_device_mac": "",
+        "devices": {},
         "typhoon_alert_km": 800,
         "typhoon_alert_enabled": True,
         "api_key": "",
         "qw_host": "",
         "location": dict(LOCATION),
-        "brand": "格力",
-        "off_time": "22:00",
-        "off_enabled": False,
-        "auto_adjust": True,
         "appearance_mode": "system",
         "baidu_key": "",
         "weather_provider": "baidu",
@@ -62,7 +57,15 @@ def load_config():
     }
 
 
-def save_config(cfg):
+def save_config(cfg, sync_device=True):
+    """保存配置。sync_device=True 时先把扁平键写回当前设备"""
+    if sync_device:
+        mac = cfg.get("current_device_mac", "")
+        if mac and mac in cfg.get("devices", {}):
+            dev = cfg["devices"][mac]
+            for k in DEVICE_KEYS:
+                if k in cfg:
+                    dev[k] = cfg[k]
     CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False))
 
 
@@ -74,18 +77,131 @@ def apply_config():
     if QW_HOST and not QW_HOST.startswith("http"):
         QW_HOST = "https://" + QW_HOST
     LOCATION = config.get("location", {"lat": 39.90, "lon": 116.40, "name": "北京"})
-    AC_BRAND = AC_BRANDS.get(config.get("brand", "格力"), "gree")
+    dev = get_current_device()
+    AC_BRAND = AC_BRANDS.get(dev.get("brand", "格力"), "gree")
+
+
+def get_current_device():
+    """返回当前选中设备的配置字典（可能为空 {}）"""
+    mac = config.get("current_device_mac", "")
+    return config.get("devices", {}).get(mac, {})
+
+
+def get_device_list():
+    """返回设备列表 [(mac, name), ...]"""
+    devs = config.get("devices", {})
+    return [(mac, devs[mac].get("name", mac[:8])) for mac in devs]
+
+
+def switch_device(mac):
+    """切换到指定设备，同步扁平键到 config 根级"""
+    if mac not in config.get("devices", {}):
+        return
+    old = config.get("current_device_mac", "")
+    if old and old in config.get("devices", {}):
+        _save_flat_to_device(old)
+    config["current_device_mac"] = mac
+    _load_device_to_flat(mac)
+    apply_config()
+
+
+DEVICE_KEYS = ("host", "port", "mac", "model", "name", "brand", "fan",
+               "schedule_enabled", "trigger_time", "off_enabled", "off_time",
+               "auto_adjust", "temp_rules")
+
+
+def _save_flat_to_device(mac):
+    """将 config 根级扁平键回写到 devices[mac]"""
+    dev = config["devices"].setdefault(mac, {})
+    for k in DEVICE_KEYS:
+        if k in config:
+            dev[k] = config[k]
+
+
+def _load_device_to_flat(mac):
+    """将 devices[mac] 键展平到 config 根级"""
+    dev = config.get("devices", {}).get(mac, {})
+    for k in DEVICE_KEYS:
+        if k in dev:
+            config[k] = dev[k]
+
+
+def add_or_update_device(mac, info):
+    """添加或更新设备信息，不覆盖已有配置"""
+    if "devices" not in config:
+        config["devices"] = {}
+    existing = config["devices"].get(mac, {})
+    # 已有设备不覆盖用户昵称
+    if mac in config["devices"]:
+        old_name = config["devices"][mac].get("name", "")
+        if old_name:
+            info = dict(info)  # 不污染调用方
+            info.pop("name", None)
+    existing.update(info)
+    config["devices"][mac] = existing
+    if not config.get("current_device_mac"):
+        config["current_device_mac"] = mac
+
+
+def _migrate_old_config():
+    """旧版扁平 config → devices 结构，清理 device.json"""
+    if "devices" in config:
+        return  # 已迁移
+
+    # 扫描局域网找设备
+    mac = "temp_" + str(int(__import__("time").time()))
+    host = ""; port = 80; model = ""
+    try:
+        from broadlinkac_core.ac_control import discover_devices
+        devices_list = discover_devices(timeout=5)
+        if devices_list:
+            d = devices_list[0]
+            mac = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
+            host = d.host[0] if isinstance(d.host, tuple) else str(d.host)
+            port = d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80
+            model = getattr(d, "model", "")
+    except Exception:
+        pass
+
+    device_entry = {
+        "host": host, "port": port, "mac": mac, "model": model,
+        "name": model or "博联设备",
+        "brand": config.pop("brand", "格力"),
+        "fan": config.pop("fan", "auto"),
+        "schedule_enabled": config.pop("schedule_enabled", True),
+        "trigger_time": config.pop("trigger_time", "12:00"),
+        "off_enabled": config.pop("off_enabled", False),
+        "off_time": config.pop("off_time", "22:00"),
+        "auto_adjust": config.pop("auto_adjust", True),
+        "temp_rules": config.pop("temp_rules", None) or [list(r) for r in DEFAULT_RULES],
+    }
+    config["devices"] = {mac: device_entry}
+    config["current_device_mac"] = mac
+
+    # 清理残余键
+    for k in ("brand", "fan", "schedule_enabled", "trigger_time",
+              "off_enabled", "off_time", "auto_adjust", "temp_rules"):
+        config.pop(k, None)
+
+    save_config(config)
+
+    # 首次有设备时，展平到根级
+    if config.get("current_device_mac") and config.get("devices"):
+        _load_device_to_flat(config["current_device_mac"])
+
+    # 删除旧 device.json
+    old_cache = APP_DIR / "device.json"
+    if old_cache.exists():
+        old_cache.unlink()
 
 
 def init(api_key=None, qw_host=None, location=None, brand=None):
-    """初始化：加载配置、同步全局变量、启动后台定时任务。
-
-       Agent 可直接传入配置，无需手动编辑 config.json：
-           init(api_key="xxx", qw_host="https://xxx.re.qweatherapi.com",
-                location={"lat": 22.54, "lon": 114.05, "name": "深圳"})
-    """
+    """初始化：加载配置、迁移旧版、同步全局变量、启动调度"""
     global config
     config = load_config()
+    _migrate_old_config()
+    if config.get("current_device_mac") and config.get("devices"):
+        _load_device_to_flat(config["current_device_mac"])
     changed = False
     if api_key:
         config["api_key"] = api_key
@@ -97,15 +213,19 @@ def init(api_key=None, qw_host=None, location=None, brand=None):
         config["location"] = location
         changed = True
     if brand:
-        config["brand"] = brand
-        changed = True
+        dev = get_current_device()
+        if dev:
+            dev["brand"] = brand
+            changed = True
     if changed:
         save_config(config)
     apply_config()
-    # 延迟导入避免循环依赖
     from broadlinkac_core.scheduler import start_scheduler
     start_scheduler()
 
 
 # 缓存的室外温度
 _cached_temp = None
+
+# 最近扫描在线的设备 MAC 集合
+_online_macs = set()

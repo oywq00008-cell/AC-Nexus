@@ -1,6 +1,5 @@
 """BroadlinkAC Core — 空调控制（博联设备 + 红外发码 + 温度规则）"""
 
-import json
 import socket
 from datetime import datetime
 
@@ -10,33 +9,13 @@ from broadlink.remote import pulses_to_data
 import broadlinkac_core.config as _cfg
 
 from broadlinkac_core.config import (
-    APP_DIR, AC_BRANDS,
+    AC_BRANDS,
 )
 
-DEVICE_CACHE = APP_DIR / "device.json"
-
-# UI 显示用（从 config.py 导入但这里定义一份用于 MODE_KEYS）
+# UI 显示用
 MODES = {"制冷": "cool", "制热": "heat", "除湿": "dry", "送风": "fan", "自动": "auto", "关闭": "off"}
 FANS = {"自动": "auto", "1 档": "1", "2 档": "2", "3 档": "3"}
 MODE_KEYS = {v: k for k, v in MODES.items()}
-
-
-def load_device_cache():
-    if DEVICE_CACHE.exists():
-        return json.loads(DEVICE_CACHE.read_text())
-    return None
-
-
-def save_device_cache(device):
-    info = {
-        "host": device.host[0],
-        "port": device.host[1],
-        "mac": device.mac.hex() if isinstance(device.mac, bytes) else str(device.mac),
-        "model": device.model,
-        "name": device.name,
-        "devtype": device.devtype,
-    }
-    DEVICE_CACHE.write_text(json.dumps(info, indent=2))
 
 
 def _get_local_ips():
@@ -85,33 +64,48 @@ def discover_devices(timeout=5):
     return all_devices
 
 
-def get_device():
-    """获取博联设备: 优先缓存直连, 失败则重新扫描并更新缓存"""
-    cached = load_device_cache()
-    if cached:
+def get_device(mac=None):
+    """获取博联设备：优先从 config 读 host 直连，失败扫描"""
+    devs = _cfg.config.get("devices", {})
+    if not mac:
+        mac = _cfg.config.get("current_device_mac", "")
+    dev = devs.get(mac, {})
+    host = dev.get("host", "")
+    
+    if host:
         try:
-            d = broadlink.hello(cached["host"])
+            d = broadlink.hello(host)
             d.auth()
             return d
         except Exception:
             pass
 
+    # 回退扫描
     all_devices = discover_devices(timeout=5)
-
     if not all_devices:
         raise Exception("未发现博联设备，请确认：\n1. 电脑和博联设备在同一个局域网\n"
                         "2. Windows 防火墙允许 UDP 端口 80 的入站/出站通信")
-
     d = all_devices[0]
     d.auth()
-    save_device_cache(d)
+    # 更新到 config
+    new_mac = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
+    _cfg.add_or_update_device(new_mac, {
+        "host": d.host[0] if isinstance(d.host, tuple) else str(d.host),
+        "port": d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80,
+        "mac": new_mac, "model": d.model, "name": d.name,
+    })
+    _cfg.save_config(_cfg.config)
     return d
 
 
-def send_ac(power: str, mode: str, temp: int, fan: str, source="手动"):
-    """发红外码，自动根据当前品牌选择协议。
-       source: \"手动\" | \"定时\" | \"自动\" — 写入日志的前缀"""
-    brand = _cfg.AC_BRAND
+def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=None):
+    """发红外码，自动根据当前设备品牌选择协议。
+       source: \"手动\" | \"定时\" | \"自动\" — 写入日志的前缀
+       mac: 设备 MAC，不传则用当前选中设备"""
+    if not mac:
+        mac = _cfg.config.get("current_device_mac", "")
+    dev = _cfg.config.get("devices", {}).get(mac, {})
+    brand = AC_BRANDS.get(dev.get("brand", "格力"), "gree")
     t = min(max(temp, 16), 30)
 
     if brand in ("gree", "midea", "hisense", "daikin", "mitsubishi"):
@@ -152,7 +146,7 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动"):
         sender.send(pwr, m, f, t)
 
     data = pulses_to_data(sender.get_durations())
-    d = get_device()
+    d = get_device(mac)
     d.send_data(data)
 
     now = datetime.now()
@@ -166,8 +160,15 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动"):
     return f"[{now:%H:%M}] {label}关机"
 
 
-def decide_ac(outdoor):
-    for low, high, target, mode in _cfg.config["temp_rules"]:
+def decide_ac(outdoor, mac=None):
+    """根据室外温度 + 当前设备规则，返回 (目标温度, 模式)"""
+    if not mac:
+        mac = _cfg.config.get("current_device_mac", "")
+    dev = _cfg.config.get("devices", {}).get(mac, {})
+    rules = dev.get("temp_rules", [])
+    if not rules:
+        return 26, "cool"
+    for low, high, target, mode in rules:
         if low <= outdoor <= high:
             return target, mode
     return 26, "cool"

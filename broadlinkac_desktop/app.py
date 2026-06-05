@@ -21,10 +21,11 @@ import broadlinkac_core.config as _cfg
 from broadlinkac_core.config import (
     APP_DIR, CONFIG_FILE, LOG_DIR,
     AC_BRANDS, save_config, apply_config,
+    get_current_device, get_device_list, switch_device, add_or_update_device,
 )
 from broadlinkac_core.ac_control import (
     MODES, FANS, MODE_KEYS,
-    load_device_cache, save_device_cache, send_ac, discover_devices, _get_local_ips,
+    send_ac, discover_devices, _get_local_ips,
 )
 from broadlinkac_core.weather import fetch_weather, city_lookup, fetch_weather_alerts
 from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, calc_distance
@@ -85,7 +86,7 @@ ctk.set_default_color_theme("blue")
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title(APP_NAME + "  v3")
+        self.title(APP_NAME + "  v3A")
         self.geometry("860x780")
         self.minsize(760, 650)
 
@@ -97,8 +98,25 @@ class App(ctk.CTk):
         # 主题
         ctk.set_appearance_mode(_cfg.config.get("appearance_mode", "system"))
 
+        # ── 设备选择栏 ──
+        self._dev_header = ctk.CTkFrame(self, fg_color="transparent")
+        self._dev_header.pack(fill="x", padx=12, pady=(6, 0))
+        ctk.CTkLabel(self._dev_header, text="📡 设备:").pack(side="left", padx=(0, 5))
+        self._dev_combo = ctk.CTkComboBox(self._dev_header, values=[], width=200,
+                                           command=self._on_device_switch, state="readonly")
+        self._dev_combo.pack(side="left")
+        ctk.CTkButton(self._dev_header, text="🔍 扫描", width=70, fg_color="#666",
+                      command=self._scan_devices).pack(side="left", padx=5)
+        ctk.CTkButton(self._dev_header, text="✏️", width=35, fg_color="#555",
+                      command=self._rename_device).pack(side="left", padx=2)
+        ctk.CTkButton(self._dev_header, text="✕", width=35, fg_color="#555",
+                      command=self._delete_device).pack(side="left", padx=2)
+        self._dev_spinner = ctk.CTkLabel(self._dev_header, text="", text_color="gray")
+        self._dev_spinner.pack(side="left", padx=5)
+        self._refresh_device_list()
+
         self.tabview = ctk.CTkTabview(self)
-        self.tabview.pack(fill="both", expand=True, padx=12, pady=(12, 0))
+        self.tabview.pack(fill="both", expand=True, padx=12, pady=(6, 0))
         self.tab_ac = self.tabview.add("🎮 空调控制")
         self.tab_ty = self.tabview.add("⚠️ 预警信息")
 
@@ -114,6 +132,9 @@ class App(ctk.CTk):
 
         self._wx_timer_id = None
         threading.Thread(target=self._init_data, daemon=True).start()
+
+        # 后台扫描设备在线状态
+        self.after(2000, self._scan_devices)
 
         self._setup_tray()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -232,6 +253,174 @@ class App(ctk.CTk):
         if hasattr(self, "_alert_source_label"):
             self._alert_source_label.configure(text=src)
 
+    # ── 设备管理 ──
+    def _refresh_device_list(self):
+        devs = get_device_list()
+        if devs:
+            values = []
+            for mac, name in devs:
+                label = name + (" (离线)" if _cfg._online_macs and mac not in _cfg._online_macs else "")
+                values.append(label)
+            self._dev_combo.configure(values=values)
+            cur = _cfg.config.get("current_device_mac", "")
+            for mac, name in devs:
+                if mac == cur:
+                    label = name + (" (离线)" if _cfg._online_macs and mac not in _cfg._online_macs else "")
+                    self._dev_combo.set(label)
+                    break
+        else:
+            self._dev_combo.configure(values=["未发现设备"])
+            self._dev_combo.set("未发现设备")
+
+    def _on_device_switch(self, choice):
+        # 去掉 (离线) 后缀匹配
+        clean_choice = choice.replace(" (离线)", "")
+        devs = get_device_list()
+        for mac, name in devs:
+            if name == clean_choice:
+                switch_device(mac)
+                save_config(_cfg.config)
+                self._refresh_device_ui()
+                return
+
+    def _refresh_device_ui(self):
+        """切换设备后刷新控制面板"""
+        dev = get_current_device()
+        self._update_brand_logo()
+        self._ctrl_card_label.configure(text=f"🎮 {dev.get('brand', '格力')}空调控制")
+
+        # 风速
+        if hasattr(self, "fan_combo"):
+            fan_keys = list(FANS.keys())
+            fan_val = dev.get("fan", "auto")
+            for k, v in FANS.items():
+                if v == fan_val:
+                    self.fan_combo.set(k)
+                    break
+
+        # 定时开关 + 时间
+        if hasattr(self, "sched_switch"):
+            if dev.get("schedule_enabled"):
+                self.sched_switch.select()
+            else:
+                self.sched_switch.deselect()
+            t = dev.get("trigger_time", "12:00").split(":")
+            if len(t) == 2:
+                self.hour_combo.set(t[0]); self.min_combo.set(t[1])
+            self._update_sched_status()
+
+        # 关机定时
+        if hasattr(self, "off_switch"):
+            if dev.get("off_enabled"):
+                self.off_switch.select()
+            else:
+                self.off_switch.deselect()
+            t = dev.get("off_time", "22:00").split(":")
+            if len(t) == 2:
+                self.off_hour_combo.set(t[0]); self.off_min_combo.set(t[1])
+
+        # 自动调温
+        if hasattr(self, "adjust_switch"):
+            if dev.get("auto_adjust", True):
+                self.adjust_switch.select()
+            else:
+                self.adjust_switch.deselect()
+
+        # 关闭设置窗口
+        if hasattr(self, "_dlg_settings") and self._dlg_settings.winfo_exists():
+            self._dlg_settings.destroy()
+
+    def _rename_device(self):
+        mac = _cfg.config.get("current_device_mac", "")
+        if not mac:
+            return
+        dev = get_current_device()
+        old_name = dev.get("name", mac[:8])
+
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("✏️ 修改设备名称")
+        self._center_on_parent(dlg, 320, 160)
+        dlg.transient(self)
+        ctk.CTkLabel(dlg, text="当前设备:").pack(padx=15, pady=(15, 2), anchor="w")
+        ctk.CTkLabel(dlg, text=f"{old_name}  ({mac})", text_color="gray").pack(padx=15, anchor="w")
+        entry = ctk.CTkEntry(dlg, width=260, placeholder_text="输入新名称")
+        entry.insert(0, old_name)
+        entry.pack(padx=15, pady=(8, 10))
+        entry.select_range(0, "end")
+
+        def do_rename():
+            new_name = entry.get().strip()
+            if not new_name or new_name == old_name:
+                dlg.destroy()
+                return
+            _cfg.config.setdefault("devices", {}).setdefault(mac, {})["name"] = new_name
+            _cfg.config["name"] = new_name
+            save_config(_cfg.config)
+            self._refresh_device_list()
+            dlg.destroy()
+
+        ctk.CTkButton(dlg, text="💾 保存", command=do_rename).pack(pady=(0, 10))
+        entry.bind("<Return>", lambda e: do_rename())
+        entry.focus_set()
+
+    def _scan_devices(self):
+        self._dev_combo.configure(state="disabled")
+        self._dev_spinner.configure(text="⏳ 扫描中...")
+        self.update()
+        threading.Thread(target=self._do_scan_devices, daemon=True).start()
+
+    def _delete_device(self):
+        mac = _cfg.config.get("current_device_mac", "")
+        devs = _cfg.config.get("devices", {})
+        if not mac or len(devs) <= 1:
+            messagebox.showwarning("无法删除", "至少需要保留一台设备")
+            return
+        name = devs.get(mac, {}).get("name", mac[:8])
+        if not messagebox.askyesno("删除设备", f"确定要删除「{name}」吗？\n该设备的定时和规则配置将一并清除。", parent=self):
+            return
+        del devs[mac]
+        _cfg.config["current_device_mac"] = next(iter(devs))
+        # 切换到第一台剩余设备
+        switch_device(_cfg.config["current_device_mac"])
+        save_config(_cfg.config)
+        self._refresh_device_list()
+        self._refresh_device_ui()
+        register_all_jobs()
+
+    def _do_scan_devices(self):
+        try:
+            devices = discover_devices(timeout=5)
+        except Exception as e:
+            self.after(0, lambda: self._dev_spinner.configure(text=f"❌ {e}"))
+            self.after(4000, lambda: self._dev_spinner.configure(text=""))
+            self.after(0, lambda: self._dev_combo.configure(state="readonly"))
+            return
+        if not devices:
+            self.after(0, lambda: self._dev_spinner.configure(text="❌ 未发现设备"))
+            self.after(4000, lambda: self._dev_spinner.configure(text=""))
+            _cfg._online_macs = set()
+            self.after(0, self._refresh_device_list)
+            self.after(0, lambda: self._dev_combo.configure(state="readonly"))
+            return
+        online = set()
+        for d in devices:
+            mac = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
+            online.add(mac)
+            add_or_update_device(mac, {
+                "host": d.host[0] if isinstance(d.host, tuple) else str(d.host),
+                "port": d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80,
+                "mac": mac, "model": d.model, "name": d.name,
+            })
+        save_config(_cfg.config)
+        apply_config()
+        _cfg._online_macs = online
+        self.after(0, self._refresh_device_list)
+        self.after(0, lambda: self._dev_combo.configure(state="readonly"))
+        self.after(0, lambda: self._dev_spinner.configure(text=f"✅ {len(devices)} 个设备"))
+        self.after(4000, lambda: self._dev_spinner.configure(text=""))
+        self.after(0, self._refresh_device_ui)
+        self.after(0, register_all_jobs)
+
     def _center_on_parent(self, child, width, height):
         """将弹窗居中于主窗口（先隐藏定位后再显示，避免闪烁）"""
         child.withdraw()
@@ -343,7 +532,8 @@ class App(ctk.CTk):
 
     # ── 设置窗口 ──
     def _open_settings(self):
-        dlg = ctk.CTkToplevel(self)
+        self._dlg_settings = ctk.CTkToplevel(self)
+        dlg = self._dlg_settings
         dlg.title("⚙️ 设置")
         self._center_on_parent(dlg, 500, 680)
         dlg.transient(self)
@@ -642,7 +832,7 @@ class App(ctk.CTk):
         ctrl_card.grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
 
         self._ctrl_card_label = ctk.CTkLabel(ctrl_card,
-            text=f"🎮 {_cfg.config.get('brand', '格力')}空调控制",
+            text=f"🎮 {get_current_device().get('brand', '格力')}空调控制",
             font=ctk.CTkFont(size=14, weight="bold"))
         self._ctrl_card_label.pack(anchor="center", padx=12, pady=(10, 5))
 
@@ -1273,8 +1463,8 @@ class App(ctk.CTk):
             ui_update()
             device_found = True
 
-            old_cache = load_device_cache()
-            old_ip = old_cache["host"] if old_cache else None
+            old_cache = get_current_device()
+            old_ip = old_cache.get("host") if old_cache else None
 
             try:
                 devices = discover_devices(timeout=5)
@@ -1291,7 +1481,12 @@ class App(ctk.CTk):
                     try:
                         d.auth()
                         ui_add_line("│    认证: ✅ 通过", "#27AE60")
-                        save_device_cache(d)
+                        mac_hex = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
+                        add_or_update_device(mac_hex, {
+                            "host": new_ip, "port": d.host[1],
+                            "mac": mac_hex, "model": d.model, "name": d.name,
+                        })
+                        save_config(_cfg.config)
                         if ip_changed:
                             ui_add_line("│    📝 缓存已更新", "#27AE60")
                     except Exception as ae:
@@ -1452,9 +1647,9 @@ class App(ctk.CTk):
         run_diagnosis()
 
     def _device_guide(self):
-        cached = load_device_cache()
-        ip = cached["host"] if cached else "未知"
-        mac = cached["mac"] if cached else "未知"
+        cached = get_current_device()
+        ip = cached.get("host") if cached else "未知"
+        mac = cached.get("mac") if cached else "未知"
         model = cached.get("model", "Broadlink RM") if cached else "Broadlink RM"
         guide = (
             "🔧 博联设备排查指南\n\n"
