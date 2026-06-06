@@ -2,6 +2,8 @@
 build/
 dist/
 *.spec
+!BroadlinkAC-macOS.spec
+!BroadlinkAC.spec
 
 # Python
 __pycache__/
