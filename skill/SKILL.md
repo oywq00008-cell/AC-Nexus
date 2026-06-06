@@ -1,7 +1,7 @@
 ---
 name: broadlinkac
-version: 3.0.0
-description: Control air conditioners via Broadlink RM devices — multi-brand IR control, weather monitoring, typhoon alerts, scheduled automation. Clone, pip install, import — zero-config Agent API.
+version: 3.1.1
+description: Control air conditioners via Broadlink RM devices — 16 AC brands, dual weather source (Baidu/QWeather), dual typhoon source (NMC/NHC), scheduled automation, auto-adjust, threat alerts. Clone, pip install, import — zero-config Agent API.
 ---
 
 # BroadlinkAC — AI Agent Smart AC Controller
@@ -11,29 +11,35 @@ Cross-platform AC control library for Broadlink RM series IR blasters. **Zero GU
 ## Quick Start (Agent)
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC-For-AI-Agent.git
-cd BroadlinkAC-For-AI-Agent
+git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
+cd BroadlinkAC-For-Agent
 pip install -r requirements-core.txt
 ```
 
 ```python
-from broadlinkac_core import init, send_ac, fetch_weather, fetch_weather_alerts
+from broadlinkac_core import init, send_ac, fetch_weather
 
-# One-time setup — all config persisted to ~/.ac_controller/config.json
+# One-time setup — all config persisted
 init(
-    api_key="your_qweather_key",
-    qw_host="https://xxx.re.qweatherapi.com",
+    baidu_key="your_baidu_key",       # Baidu weather (default)
+    # or use QWeather:
+    # api_key="your_qw_key", qw_host="https://xxx.re.qweatherapi.com",
     location={"lat": 22.54, "lon": 114.05, "name": "Shenzhen"},
     brand="Gree"
 )
 
 # Control AC
-send_ac("on", "cool", 26, "auto")   # Turn on, cool 26°C, auto fan
-send_ac("off", "cool", 26, "auto")  # Turn off
+send_ac("on", "cool", 26, "auto")     # Turn on, cool 26°C, auto fan
+send_ac("off", "cool", 26, "auto")    # Turn off
 
-# Get weather
-weather = fetch_weather()            # Real-time temp, humidity, feels-like
-alerts = fetch_weather_alerts()      # Local disaster warnings (heat/rain/typhoon)
+# Weather — dual source (Baidu default, falls back to QWeather)
+weather = fetch_weather()              # Real-time temp, humidity, feels-like
+
+# Typhoon threat — returns (distance_km, storm_name)
+from broadlinkac_core import typhoon_threat_distance
+dist, name = typhoon_threat_distance()
+if dist < 100:
+    send_ac("off", "cool", 26, "auto")  # Storm protection: auto-shutdown
 ```
 
 ## API Reference
@@ -41,75 +47,101 @@ alerts = fetch_weather_alerts()      # Local disaster warnings (heat/rain/typhoo
 ### Setup
 | Function | Description |
 |----------|-------------|
-| `init(api_key=None, qw_host=None, location=None, brand=None)` | Initialize config + start background scheduler. All params optional — subsequent calls read from persistent config. |
+| `init(baidu_key=None, api_key=None, qw_host=None, location=None, brand=None)` | Initialize config + start background scheduler |
 
-### AC Control
+### AC Control (16 brands)
 | Function | Description |
 |----------|-------------|
 | `send_ac(power, mode, temp, fan)` | Send IR command. `power`: `"on"`/`"off"`. `mode`: `"cool"`/`"heat"`/`"dry"`/`"fan"`/`"auto"`. `temp`: 16-30. `fan`: `"auto"`/`"1"`/`"2"`/`"3"` |
 | `decide_ac(outdoor_temp)` | Run temperature rules → returns `(target_temp, mode)` |
+| `get_device()` | Get connected Broadlink device |
 
-### Weather & Alerts
+### Weather & Alerts (Dual Source)
 | Function | Description |
 |----------|-------------|
-| `fetch_weather()` | Current weather (temp, humidity, feels-like, wind) via QWeather API |
-| `fetch_weather_alerts()` | Local weather warnings — returns list of `{headline, severity, description, senderName, effectiveTime, expireTime}` |
-| `city_lookup(query)` | OpenStreetMap city search → coordinates |
+| `fetch_weather()` | Current weather — auto-routes via Baidu/QWeather based on config |
+| `fetch_weather_alerts()` | Local weather warnings — `[{headline, severity, description, ...}]` |
 
-### Typhoon
+### Typhoon & Hurricane (Dual Source: NMC + NHC)
 | Function | Description |
 |----------|-------------|
-| `fetch_typhoons()` | Active NW Pacific typhoons from China NMC |
-| `fetch_typhoon_detail(typhoon_id)` | Detailed track + forecast |
+| `fetch_typhoons()` | Active storms from NMC (NW Pacific) or NHC (Atlantic, configurable) |
+| `fetch_typhoon_detail(typhoon_id)` | Detailed track + forecast points |
+| `typhoon_threat_distance()` | **Agent-critical**: nearest storm distance (km) + name. < 100km = should shutdown |
+| `calc_distance(lat1, lon1, lat2, lon2)` | Haversine distance |
 
-## Supported AC Brands
+### Logger
+| Function | Description |
+|----------|-------------|
+| `write_log(category, msg)` | Append daily operation log |
+| `read_log(date_str)` | Read log by date |
+| `get_log_dates()` | List dates with logs |
 
-**hvac_ir (5 brands):** Gree, Midea, Hisense, Daikin, Mitsubishi
+## Supported AC Brands (16)
 
-**Custom protocols (3 brands):** Haier, AUX, Panasonic (ported from IRremoteESP8266 C++)
+**hvac_ir:** Gree, Midea, Hisense, Daikin, Mitsubishi, Hitachi, Fujitsu, Ballu, Carrier MCA, Hyundai, Fuego
 
-Select in Settings or pass `brand=` to `init()`. Device auto-discovered on LAN via Broadlink UDP.
+**Custom protocols:** Haier, AUX, Panasonic (ported from IRremoteESP8266 C++)
+
+**Multi-brand mappings:** Xiaomi, Hualing → Midea protocol
+
+Select in Settings or pass `brand=` to `init()`. Supports English names too (`"hitachi"`, `"fujitsu"`, etc.).
+
+## Weather Providers
+
+| Provider | Endpoint | Daily Calls | Features |
+|----------|----------|-------------|----------|
+| Baidu | `api.map.baidu.com` (default) | 5,000 | Real-time + 7-day forecast + hourly + alerts + AQI |
+| QWeather | Personal Host | 50,000/month | Real-time + forecast + alerts (personal host required) |
+
+Agent can read/write provider via `_cfg.config["weather_provider"]` and `_cfg.config["baidu_key"]`.
 
 ## Key Design
 
-- `import broadlinkac_core` has **zero side effects** — no network I/O, no filesystem reads, no threads started
+- `import broadlinkac_core` has **zero side effects** — no I/O, no threads
 - `init()` is idempotent — safe to call multiple times
 - Config auto-persisted to `~/.ac_controller/config.json`
-- Runs on any device with Python 3.9+ (macOS/Windows/Linux/Raspberry Pi/NAS)
+- Runs on any device with Python 3.9+ (macOS/Windows/Linux/Raspberry Pi)
+- `typhoon_threat_distance()` never throws — returns `(99999, "")` on any error
+- `_fetch_all()` auto-retries on network failure
 
 ## Common Agent Tasks
 
-### "Turn on the AC to 26°C cooling"
+### "Is there a typhoon nearby? Should I turn off the AC?"
 ```python
-from broadlinkac_core import init, send_ac
+from broadlinkac_core import init, typhoon_threat_distance, send_ac
 init()
-send_ac("on", "cool", 26, "auto")
+dist, name = typhoon_threat_distance()
+if dist < 100:
+    send_ac("off", "cool", 26, "auto")
+    print(f"⚠️ {name} only {dist}km away — AC shut down for safety")
 ```
 
-### "What's the temperature outside?"
+### "Turn on the AC and auto-adjust based on outdoor temperature"
 ```python
-from broadlinkac_core import init, fetch_weather
+from broadlinkac_core import init, fetch_weather, decide_ac, send_ac
 init()
 w = fetch_weather()
-# Returns {"temp": "31", "text": "晴", "feelsLike": "33", "humidity": "65", ...}
+if w:
+    target, mode = decide_ac(float(w["temp"]))
+    send_ac("on", mode, target, "auto")
 ```
 
-### "Are there any weather warnings?"
+### "What's the weather and are there any alerts?"
 ```python
-from broadlinkac_core import init, fetch_weather_alerts
+from broadlinkac_core import init, fetch_weather, fetch_weather_alerts
 init()
+w = fetch_weather()
 alerts = fetch_weather_alerts()
 for a in alerts:
     print(f"[{a['severity']}] {a['headline']}")
 ```
 
-### "Turn off the AC at 10pm"
-```python
-# Set off_time in config, then the built-in scheduler handles it
-import broadlinkac_core.config as _cfg
-from broadlinkac_core import init
-init()
-_cfg.config["off_time"] = "22:00"
-_cfg.config["off_enabled"] = True
-_cfg.save_config(_cfg.config)
-```
+## Desktop GUI
+
+Pre-built installers for all platforms, auto-built by GitHub Actions:
+- 🍎 macOS `.app` — double-click to run
+- 🪟 Windows `.exe` — double-click to run
+- 🐧 Linux `.tar.gz` — extract and run
+
+Download from [Releases](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest).
