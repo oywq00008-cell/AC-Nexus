@@ -142,7 +142,7 @@ def fetch_nhc_storms():
                 "id": s["id"], "eng": s["name"], "cn": s["name"],
                 "code": s["binNumber"], "meaning": "",
                 "detail": {
-                    "cn": s["name"], "eng": s["name"],
+                    "cn": s["name"], "eng": s["name"], "code": s["binNumber"],
                     "cat": NHC_CAT.get(s["classification"], s["classification"]),
                     "lat": s["latitudeNumeric"], "lon": s["longitudeNumeric"],
                     "pressure": int(s["pressure"]), "wind": wind_ms,
