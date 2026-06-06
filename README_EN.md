@@ -2,7 +2,7 @@
 
 [中文](README.md) | English
 
-Smart AC controller for Broadlink RM series — desktop app + **AI Agent programmable API**. Multi-device, scheduled/adaptive temperature control, dual-source weather alerts, typhoon path map.
+BroadlinkAC is more than a desktop AC remote — it's an **IR control protocol stack built for AI Agents**. Plug in a Broadlink RM IR blaster, and any AI Agent can control **17 AC brands** (Gree, Hitachi, Daikin, etc.) with a single line of Python: `import broadlinkac_core`. Multi-device parallel scheduling, outdoor-temperature-aware auto-adjust, typhoon alerts — the desktop app and headless Agent mode share the exact same core. Windows & macOS, works out of the box.
 
 ![Main UI](assets/screenshot-main.png)
 ![Typhoon Tracking](assets/screenshot-typhoon.png)

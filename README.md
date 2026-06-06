@@ -2,7 +2,7 @@
 
 [English](README_EN.md) | 中文
 
-博联空调智能控制器 — 桌面应用 + **AI Agent 可编程 API**。支持局域网多设备管理、定时/自动调温、双源天气预警、台风路径图。
+BroadlinkAC 不止是一个空调遥控器桌面应用——它是一套**为 AI Agent 而生的红外控制协议栈**。接入博联 RM 红外模块后，任何 AI Agent 只需 `import broadlinkac_core`，即可用一行 Python 控制格力、日立、大金等 **17 种品牌**的空调。支持多设备并行调度、室外温度自适应调温、台风预警，桌面应用和命令行/Agent 两个模式共享同一套核心，Windows 和 macOS 即装即用。
 
 ![主界面](assets/screenshot-main.png)
 ![台风预警](assets/screenshot-typhoon.png)
