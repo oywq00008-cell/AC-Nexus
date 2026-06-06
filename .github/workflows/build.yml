@@ -11,7 +11,7 @@ on:
         required: false
 
 jobs:
-  # ── Linux .deb ──
+  # ── Linux ──
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-linux, path: BroadlinkAC-linux.tar.gz }
 
-  # ── Windows .exe ──
+  # ── Windows ──
   build-windows:
     runs-on: windows-latest
     steps:
@@ -44,21 +44,22 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-Windows, path: BroadlinkAC-Windows.zip }
 
-  # ── macOS .app ──
+  # ── macOS ──
   build-macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
+        with: { python-version: '3.12' }
       - run: |
           pip install -r requirements.txt pyinstaller
+          pip install pyobjc-framework-cocoa
           pyinstaller BroadlinkAC-macOS.spec
           cd dist && zip -r ../BroadlinkAC-macOS.zip BroadlinkAC.app
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-macOS, path: BroadlinkAC-macOS.zip }
 
-  # ── 打 tag 时自动创建 Release ──
+  # ── Release ──
   release:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: [build-linux, build-windows, build-macos]
