@@ -66,15 +66,40 @@ def scheduled_off_job(mac):
 
 
 def refresh_typhoon_silent():
-    """后台静默刷新台风，记录日志"""
+    """后台静默刷新台风，记录日志，必要时自动关闭所有空调"""
     try:
         typhoons = fetch_typhoons()
+        min_dist = 99999
         for t in typhoons:
             detail = fetch_typhoon_detail(t["id"])
             if detail:
                 dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"], detail["lat"], detail["lon"])
                 status = "⚠️ 预警" if dist < _cfg.config["typhoon_alert_km"] else "✅ 安全"
                 write_log("台风", f"{detail['cn']} ({detail['eng']}) {detail['cat']} 距{dist}km {status}")
+                if dist < min_dist:
+                    min_dist = dist
+
+        # ── 台风自动关空调 ──
+        if not _cfg.config.get("typhoon_ac_off", True):
+            return
+        if min_dist < 100 and not _cfg._ty_ac_off_sent:
+            _cfg._ty_ac_off_sent = True
+            offline_count = 0
+            off_count = 0
+            for mac, dev in _cfg.config.get("devices", {}).items():
+                name = dev.get("name", mac[:8])
+                if not _device_online(mac):
+                    offline_count += 1
+                    continue
+                try:
+                    send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
+                    write_log("空调", f"🌀 台风靠近（距{min_dist}km）→ [{name}] 已自动关机")
+                    off_count += 1
+                except Exception as e:
+                    write_log("系统", f"台风关机失败 [{name}]: {e}")
+            write_log("系统", f"🌀 台风自动关机完成: 关闭 {off_count} 台, 离线 {offline_count} 台")
+        elif min_dist >= 100:
+            _cfg._ty_ac_off_sent = False  # 远离后重置
     except Exception as e:
         print(f"[台风后台] {e}")
 

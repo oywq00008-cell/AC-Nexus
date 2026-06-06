@@ -1166,6 +1166,10 @@ class App(ctk.CTk):
         self.ty_alert_switch.pack(side="left")
         if _cfg.config.get("typhoon_alert_enabled", True):
             self.ty_alert_switch.select()
+        self.ty_ac_off_switch = ctk.CTkSwitch(bot, text="台风临近关空调")
+        self.ty_ac_off_switch.pack(side="left", padx=5)
+        if _cfg.config.get("typhoon_ac_off", True):
+            self.ty_ac_off_switch.select()
         ctk.CTkButton(bot, text="💾 保存", width=60, fg_color="#666",
                       command=self._save_ty_settings).pack(side="left", padx=8)
         ctk.CTkButton(bot, text="🌍 卫星云图", fg_color="#555", width=80,
@@ -1268,6 +1272,7 @@ class App(ctk.CTk):
         except:
             _cfg.config["typhoon_alert_km"] = 800
         _cfg.config["typhoon_alert_enabled"] = bool(self.ty_alert_switch.get())
+        _cfg.config["typhoon_ac_off"] = bool(self.ty_ac_off_switch.get())
         save_config(_cfg.config)
         write_log("系统", "台风预警设置已更新")
 

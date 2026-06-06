@@ -62,6 +62,7 @@ def load_config():
         "devices": {},
         "typhoon_alert_km": 800,
         "typhoon_alert_enabled": True,
+        "typhoon_ac_off": True,
         "typhoon_provider": "nmc",
         "api_key": "",
         "qw_host": "",
@@ -245,3 +246,6 @@ _cached_temp = None
 
 # 最近扫描在线的设备 MAC 集合
 _online_macs = set()
+
+# 台风自动关空调：防止每30分钟重复触发
+_ty_ac_off_sent = False
