@@ -28,7 +28,7 @@ from broadlinkac_core.ac_control import (
     send_ac, discover_devices, _get_local_ips,
 )
 from broadlinkac_core.weather import fetch_weather, city_lookup, fetch_weather_alerts
-from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, fetch_nhc_storms, calc_distance, typhoon_threat_distance
+from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, fetch_nhc_storms, calc_distance, typhoon_threat_distance, fetch_and_cache, get_cached, judge_and_shutdown
 from broadlinkac_core.logger import write_log, read_log, get_log_dates
 from broadlinkac_core.scheduler import (
     _sched_lock, scheduled_job, register_all_jobs,
@@ -140,6 +140,9 @@ class App(ctk.CTk):
 
         self._setup_tray()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # 台风独立启动
+        self.after(500, self._ty_fetch)
 
     # ── 菜单栏 ──
     def _build_menu(self):
@@ -1359,8 +1362,6 @@ class App(ctk.CTk):
         self._fetch_all()
         self.after(0, self._render_all)
         self.after(0, self._schedule_refresh)
-        # 台风线独立 30 分钟周期：立即拉一次 + 开始循环
-        self._ty_fetch()
 
     # ── 台风 30 分钟周期 ──
 
@@ -1369,75 +1370,23 @@ class App(ctk.CTk):
         threading.Thread(target=self._do_ty_fetch, daemon=True).start()
 
     def _do_ty_fetch(self):
-        """后台线程：根据 typhoon_provider 拉数据 → 写缓存"""
-        try:
-            provider = _cfg.config.get("typhoon_provider", "nmc")
-            if provider == "nhc":
-                cycs = fetch_nhc_storms()
-            else:
-                cycs = []
-                for t in fetch_typhoons():
-                    d = fetch_typhoon_detail(t["id"])
-                    if d:
-                        cycs.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"],
-                                     "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
-            self._ty_data = cycs
-        except Exception as e:
-            self._ty_data = []
-            print(f"[台风数据] 获取失败: {e}")
+        """后台线程：调用 typhoon 模块拉数据 → 写缓存"""
+        fetch_and_cache()
         self.after(0, self._ty_cycle_render)
+
 
     def _ty_cycle_render(self):
         """主线程：渲染台风卡片 → 判断预警弹窗 + 自动关空调 → 重设计时器"""
         try:
             self._render_typhoon()
 
-            cycs = self._ty_data
-            alert_km = _cfg.config.get("typhoon_alert_km", 800)
+            # 调 typhoon 模块做判断
+            alerts, self._ty_ac_off_sent = judge_and_shutdown(
+                write_log, self._ty_alert_muted, self._ty_ac_off_sent)
 
-            # 遍历弹窗
-            for t in cycs:
-                detail = t.get("detail")
-                if not detail:
-                    continue
-                dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
-                                     detail["lat"], detail["lon"])
-                if (dist < alert_km
-                        and _cfg.config.get("typhoon_alert_enabled", True)
-                        and not self._ty_alert_muted):
-                    self._show_ty_alert(detail, dist)
-
-            # 自动关空调
-            min_dist, nearest_name = typhoon_threat_distance()
-            if _cfg.config.get("typhoon_ac_off", True):
-                if min_dist < 100 and not self._ty_ac_off_sent:
-                    self._ty_ac_off_sent = True
-                    offline_count = 0
-                    off_count = 0
-                    for mac, dev in _cfg.config.get("devices", {}).items():
-                        name = dev.get("name", mac[:8])
-                        if not _cfg._online_macs or mac not in _cfg._online_macs:
-                            offline_count += 1
-                            continue
-                        try:
-                            send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
-                            write_log("空调", f"🌀 台风靠近（距{min_dist}km）→ [{name}] 已自动关机")
-                            off_count += 1
-                        except Exception as e:
-                            write_log("系统", f"台风关机失败 [{name}]: {e}")
-                    write_log("系统", f"🌀 台风自动关机完成: 关闭 {off_count} 台, 离线 {offline_count} 台")
-                elif min_dist >= 100:
-                    self._ty_ac_off_sent = False
-
-            # 日志
-            for t in cycs:
-                detail = t.get("detail")
-                if not detail:
-                    continue
-                dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
-                                     detail["lat"], detail["lon"])
-                status = "⚠️ 预警" if dist < alert_km else "✅ 安全"
-                write_log("台风", f"{detail['cn']} ({detail['eng']}) {detail['cat']} 距{dist}km {status}")
+            # 弹窗
+            for detail, dist in alerts:
+                self._show_ty_alert(detail, dist)
 
         except Exception as e:
             write_log("系统", f"[台风周期] 异常: {e}")
@@ -1504,7 +1453,7 @@ class App(ctk.CTk):
         self._fetch_typhoon_all()
 
     def _fetch_typhoon_all(self):
-        """根据 typhoon_provider 拉取台风数据 → 渲染 + 判断 → 重设计时器"""
+        """手动刷新台风 → 渲染 + 判断 → 重设计时器"""
         self._ty_fetch()
 
     def _render_all(self):
@@ -1884,7 +1833,7 @@ class App(ctk.CTk):
     def _do_render_typhoon(self):
         for w in self.ty_frame.winfo_children():
             w.destroy()
-        typhoons = self._ty_data
+        typhoons = get_cached()
         if not typhoons:
             provider = _cfg.config.get("typhoon_provider", "nmc")
             msg = "北大西洋当前无活跃飓风 ✅" if provider == "nhc" else "西北太平洋当前无活跃台风 ✅"

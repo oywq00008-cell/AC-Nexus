@@ -189,3 +189,80 @@ def fetch_nhc_storms():
         except Exception as e:
             print(f"[NHC] 解析 {s.get('name', '?')} 失败: {e}")
     return results
+
+
+# ── 台风缓存与调度 ──
+_ty_cache = []
+
+
+def fetch_and_cache():
+    global _ty_cache
+    try:
+        import broadlinkac_core.config as _cfg
+        provider = _cfg.config.get("typhoon_provider", "nmc")
+        _ty_cache = []
+        if provider == "nhc":
+            _ty_cache = fetch_nhc_storms()
+        else:
+            for t in fetch_typhoons():
+                d = fetch_typhoon_detail(t["id"])
+                if d:
+                    _ty_cache.append({
+                        "id": t["id"], "eng": t["eng"], "cn": t["cn"],
+                        "code": t.get("code", ""), "meaning": t.get("meaning", ""),
+                        "detail": d
+                    })
+    except Exception as e:
+        _ty_cache = []
+        print(f"[台风缓存] {e}")
+
+
+def get_cached():
+    return _ty_cache
+
+
+def judge_and_shutdown(write_log_func, ty_alert_muted=False, ty_ac_off_sent=False):
+    alerts = []
+    min_dist = 99999
+    import broadlinkac_core.config as _cfg
+
+    alert_km = _cfg.config.get("typhoon_alert_km", 800)
+    alert_enabled = _cfg.config.get("typhoon_alert_enabled", True)
+    ac_off_enabled = _cfg.config.get("typhoon_ac_off", True)
+    loc_lat = _cfg.LOCATION["lat"]
+    loc_lon = _cfg.LOCATION["lon"]
+
+    for t in _ty_cache:
+        detail = t.get("detail")
+        if not detail:
+            continue
+        dist = calc_distance(loc_lat, loc_lon, detail["lat"], detail["lon"])
+        status = "⚠️ 预警" if dist < alert_km else "✅ 安全"
+        write_log_func("台风", f"{detail['cn']} ({detail['eng']}) {detail['cat']} 距{dist}km {status}")
+        if dist < min_dist:
+            min_dist = dist
+        if dist < alert_km and alert_enabled and not ty_alert_muted:
+            alerts.append((detail, dist))
+
+    if ac_off_enabled and min_dist < 100 and not ty_ac_off_sent:
+        ty_ac_off_sent = True
+        from broadlinkac_core.ac_control import send_ac
+        devices = _cfg.config.get("devices", {})
+        offline_count = off_count = 0
+        for mac, dev in devices.items():
+            name = dev.get("name", mac[:8])
+            online = not _cfg._online_macs or mac in _cfg._online_macs
+            if not online:
+                offline_count += 1
+                continue
+            try:
+                send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
+                write_log_func("空调", f"[{datetime.now():%H:%M}] 台风靠近（距{min_dist}km）→ [{name}] 已自动关机")
+                off_count += 1
+            except Exception as e:
+                write_log_func("系统", f"台风关机失败 [{name}]: {e}")
+        write_log_func("系统", f"[{datetime.now():%H:%M}] 台风自动关机完成: 关闭 {off_count} 台, 离线 {offline_count} 台")
+    elif min_dist >= 100:
+        ty_ac_off_sent = False
+
+    return alerts, ty_ac_off_sent
