@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_submodules
 
 a = Analysis(
     ['ac_controller.py'],
@@ -7,10 +8,8 @@ a = Analysis(
     datas=[('protocols', 'protocols'), ('logos', 'logos'), ('使用文档.md', '.'), ('broadlink.png', '.'), ('broadlink.ico', '.')],
     hiddenimports=[
         'protocols.haier', 'protocols.aux_ac', 'protocols.panasonic',
-        'hvac_ir.gree', 'hvac_ir.midea', 'hvac_ir.hisense',
-        'hvac_ir.daikin', 'hvac_ir.mitsubishi',
         'pystray', 'PIL',
-    ],
+    ] + collect_submodules('hvac_ir'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
