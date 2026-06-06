@@ -109,6 +109,35 @@ def calc_distance(lat1, lon1, lat2, lon2):
     return round(R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
 
 
+def typhoon_threat_distance(provider=None):
+    """评估最近风暴/飓风距离 (km)。
+    Agent 可直接调用：<100km 即应关机。返回 (距离, 名称)。
+    provider 不传则走 config 当前设置。
+    """
+    import broadlinkac_core.config as _cfg
+    provider = provider or _cfg.config.get("typhoon_provider", "nmc")
+    lat = _cfg.LOCATION["lat"]
+    lon = _cfg.LOCATION["lon"]
+    min_dist, name = 99999, ""
+
+    if provider == "nhc":
+        storms = fetch_nhc_storms()
+        for s in storms:
+            d = s.get("detail", {})
+            if d:
+                dist = calc_distance(lat, lon, d["lat"], d["lon"])
+                if dist < min_dist:
+                    min_dist, name = dist, d["cn"]
+    else:
+        for t in fetch_typhoons():
+            d = fetch_typhoon_detail(t["id"])
+            if d:
+                dist = calc_distance(lat, lon, d["lat"], d["lon"])
+                if dist < min_dist:
+                    min_dist, name = dist, d["cn"]
+    return min_dist, name
+
+
 # ── NHC 飓风数据源 ──
 
 NHC_CAT = {"TD": "热带低压", "TS": "热带风暴", "HU": "飓风", "PTC": "后热带气旋"}
