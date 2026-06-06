@@ -4,6 +4,10 @@
 
 博联空调智能控制器 — 桌面应用 + **AI Agent 可编程 API**。支持局域网多设备管理、定时/自动调温、双源天气预警、台风路径图。
 
+![主界面](assets/screenshot-main.png)
+![台风预警](assets/screenshot-typhoon.png)
+![设置](assets/screenshot-settings.png)
+
 ## 🤖 Agent 调用
 
 ```python

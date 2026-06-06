@@ -4,6 +4,10 @@
 
 Smart AC controller for Broadlink RM series — desktop app + **AI Agent programmable API**. Multi-device, scheduled/adaptive temperature control, dual-source weather alerts, typhoon path map.
 
+![Main UI](assets/screenshot-main.png)
+![Typhoon Tracking](assets/screenshot-typhoon.png)
+![Settings](assets/screenshot-settings.png)
+
 ## 🤖 Agent API
 
 ```python
