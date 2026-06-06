@@ -107,3 +107,51 @@ def calc_distance(lat1, lon1, lat2, lon2):
     dlon = math.radians(lon2 - lon1)
     a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
     return round(R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+
+
+# ── NHC 飓风数据源 ──
+
+NHC_CAT = {"TD": "热带低压", "TS": "热带风暴", "HU": "飓风", "PTC": "后热带气旋"}
+DIRS = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"]
+
+
+def fetch_nhc_storms():
+    """拉取 NHC 活跃飓风，归一化为与 NMC 相同的 _typhoons_data 格式"""
+    try:
+        req = urllib.request.Request(
+            "https://www.nhc.noaa.gov/CurrentStorms.json",
+            headers={"User-Agent": "BroadlinkAC/3.0"}
+        )
+        resp = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[NHC] 请求失败: {e}")
+        return []
+
+    results = []
+    for s in data.get("activeStorms", []):
+        try:
+            kt = int(s["intensity"])
+            wind_ms = round(kt * 0.514)
+            wind_kmh = round(kt * 1.852)
+            move_spd = round(int(s["movementSpeed"]) * 1.852)
+            move_dir = DIRS[round(int(s["movementDir"]) / 45) % 8]
+            update = s["lastUpdate"].replace("T", " ").replace("Z", "").split(".")[0]
+
+            results.append({
+                "id": s["id"], "eng": s["name"], "cn": s["name"],
+                "code": s["binNumber"], "meaning": "",
+                "detail": {
+                    "cn": s["name"], "eng": s["name"],
+                    "cat": NHC_CAT.get(s["classification"], s["classification"]),
+                    "lat": s["latitudeNumeric"], "lon": s["longitudeNumeric"],
+                    "pressure": int(s["pressure"]), "wind": wind_ms,
+                    "direction": f"{move_dir} ({s['movementDir']}°)",
+                    "speed": move_spd,
+                    "update_time": update,
+                    "forecasts": [],  # NHC 预报在 KMZ 文件里，不解析
+                }
+            })
+        except Exception as e:
+            print(f"[NHC] 解析 {s.get('name', '?')} 失败: {e}")
+    return results

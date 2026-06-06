@@ -28,7 +28,7 @@ from broadlinkac_core.ac_control import (
     send_ac, discover_devices, _get_local_ips,
 )
 from broadlinkac_core.weather import fetch_weather, city_lookup, fetch_weather_alerts
-from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, calc_distance
+from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, fetch_nhc_storms, calc_distance
 from broadlinkac_core.logger import write_log, read_log, get_log_dates
 from broadlinkac_core.scheduler import (
     _sched_lock, scheduled_job, register_all_jobs,
@@ -1094,15 +1094,19 @@ class App(ctk.CTk):
         left.configure(border_width=1, border_color="#4A4A4A", corner_radius=8)
         left.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
-        # 标题行: 标题 + 右上角刷新按钮
+        # 标题行: 来源下拉 + 右上角刷新按钮
         ty_title_row = ctk.CTkFrame(left, fg_color="transparent")
         ty_title_row.pack(fill="x", padx=10, pady=(8, 2))
-        ctk.CTkLabel(ty_title_row, text="🌀 西北太平洋台风",
-                     font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
+        ctk.CTkLabel(ty_title_row, text="🌀", font=ctk.CTkFont(size=18)).pack(side="left")
+        self._ty_provider_combo = ctk.CTkComboBox(ty_title_row,
+            values=["西北太平洋台风", "北大西洋飓风"], width=170,
+            command=self._on_ty_provider_change, state="readonly")
+        self._ty_provider_combo.pack(side="left", padx=5)
         ctk.CTkButton(ty_title_row, text="🔄 刷新", fg_color="#4A90D9", height=24, width=70,
                       command=self._fetch_typhoon_all).pack(side="right")
-        ctk.CTkLabel(left, text="数据: 中央气象台", font=ctk.CTkFont(size=12), text_color="gray").pack(
-            anchor="w", padx=10)
+        self._ty_source_label = ctk.CTkLabel(left, text="", font=ctk.CTkFont(size=12), text_color="gray")
+        self._ty_source_label.pack(anchor="w", padx=10)
+        self._update_ty_source_label()
 
         self.ty_frame = ctk.CTkFrame(left, fg_color="transparent")
         self.ty_frame.pack(fill="both", expand=True, padx=8, pady=5)
@@ -1309,10 +1313,14 @@ class App(ctk.CTk):
                 pass
         self._alerts_data, self._alerts_provider = fetch_weather_alerts()
         self._typhoons_data = []
-        for t in fetch_typhoons():
-            d = fetch_typhoon_detail(t["id"])
-            if d:
-                self._typhoons_data.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"], "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
+        provider = _cfg.config.get("typhoon_provider", "nmc")
+        if provider == "nhc":
+            self._typhoons_data = fetch_nhc_storms()
+        else:
+            for t in fetch_typhoons():
+                d = fetch_typhoon_detail(t["id"])
+                if d:
+                    self._typhoons_data.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"], "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
 
     def _fetch_weather_all(self):
         """手动刷新天气+预警 → 渲染 → 重设计时器"""
@@ -1328,13 +1336,37 @@ class App(ctk.CTk):
         self._update_alert_source()
         self._schedule_refresh()
 
+    def _update_ty_source_label(self):
+        """更新台风数据源标签文字"""
+        provider = _cfg.config.get("typhoon_provider", "nmc")
+        if provider == "nhc":
+            self._ty_source_label.configure(text="数据: 美国国家飓风中心 (NHC)")
+            self._ty_provider_combo.set("北大西洋飓风")
+        else:
+            self._ty_source_label.configure(text="数据: 中央气象台 (NMC)")
+            self._ty_provider_combo.set("西北太平洋台风")
+
+    def _on_ty_provider_change(self, choice):
+        """切换台风数据源 → 清缓存 → 重新拉取"""
+        if "飓风" in choice:
+            _cfg.config["typhoon_provider"] = "nhc"
+        else:
+            _cfg.config["typhoon_provider"] = "nmc"
+        _cfg.save_config(_cfg.config, sync_device=False)
+        self._update_ty_source_label()
+        self._fetch_typhoon_all()
+
     def _fetch_typhoon_all(self):
-        """手动刷新台风详情 → 渲染 → 重设计时器"""
+        """根据 typhoon_provider 拉取台风数据 → 缓存 → 渲染"""
         self._typhoons_data = []
-        for t in fetch_typhoons():
-            d = fetch_typhoon_detail(t["id"])
-            if d:
-                self._typhoons_data.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"], "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
+        provider = _cfg.config.get("typhoon_provider", "nmc")
+        if provider == "nhc":
+            self._typhoons_data = fetch_nhc_storms()
+        else:
+            for t in fetch_typhoons():
+                d = fetch_typhoon_detail(t["id"])
+                if d:
+                    self._typhoons_data.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"], "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
         self._render_typhoon()
         self._schedule_refresh()
 
@@ -1715,7 +1747,9 @@ class App(ctk.CTk):
             w.destroy()
         typhoons = self._typhoons_data
         if not typhoons:
-            ctk.CTkLabel(self.ty_frame, text="西北太平洋当前无活跃台风 ✅",
+            provider = _cfg.config.get("typhoon_provider", "nmc")
+            msg = "北大西洋当前无活跃飓风 ✅" if provider == "nhc" else "西北太平洋当前无活跃台风 ✅"
+            ctk.CTkLabel(self.ty_frame, text=msg,
                          font=ctk.CTkFont(size=16)).pack(pady=30)
             self.ty_time_label.configure(text=f"上次更新: {datetime.now():%H:%M}")
             self._ty_page_prev.pack_forget()
@@ -1752,7 +1786,8 @@ class App(ctk.CTk):
             d1.pack(fill="x", padx=10)
             ctk.CTkLabel(d1, text=f"等级: {detail['cat']}  |  气压: {detail['pressure']}hPa  |  "
                                   f"风速: {detail['wind']}m/s", font=ctk.CTkFont(size=14)).pack(anchor="center")
-            ctk.CTkLabel(d1, text=f"位置: {detail['lat']}°N, {detail['lon']}°E  |  "
+            lon_str = f"{abs(detail['lon']):.1f}°{'W' if detail['lon'] < 0 else 'E'}" if detail['lon'] < 0 else f"{detail['lon']}°E"
+            ctk.CTkLabel(d1, text=f"位置: {detail['lat']}°N, {lon_str}  |  "
                                   f"移向: {detail['direction']}  |  移速: {detail['speed']}km/h",
                          font=ctk.CTkFont(size=14)).pack(anchor="center")
             dist_trend = ""
@@ -1826,7 +1861,8 @@ class App(ctk.CTk):
                                font=("", 8), anchor="s")
             if alert and _cfg.config.get("typhoon_alert_enabled", True) and not self._ty_alert_muted:
                 self._show_ty_alert(detail, dist)
-            write_log("台风", f"{detail['cn']} {detail['cat']} {detail['lat']}N,{detail['lon']}E 距{dist}km {status}")
+            lon_log = f"{detail['lon']}°{'W' if detail['lon'] < 0 else 'E'}"
+            write_log("台风", f"{detail['cn']} {detail['cat']} {detail['lat']}N,{lon_log} 距{dist}km {status}")
 
         self.ty_time_label.configure(text=f"上次更新: {datetime.now():%H:%M}")
 

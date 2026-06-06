@@ -62,6 +62,7 @@ def load_config():
         "devices": {},
         "typhoon_alert_km": 800,
         "typhoon_alert_enabled": True,
+        "typhoon_provider": "nmc",
         "api_key": "",
         "qw_host": "",
         "location": dict(LOCATION),
