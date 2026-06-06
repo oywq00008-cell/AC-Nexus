@@ -81,8 +81,11 @@ Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — 
 
 | Platform | Download |
 |----------|----------|
-| Windows | [BroadlinkAC-V3A.7z](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
-| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
+| 🪟 Windows | [BroadlinkAC.exe](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-Windows.zip) |
+| 🍎 macOS | [BroadlinkAC.app](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-macOS.zip) |
+| 🐧 Linux | [BroadlinkAC-linux](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-linux.tar.gz) |
+
+> 💡 All packages are auto-built by GitHub Actions and updated with every release.
 
 macOS first run:
 ```bash
