@@ -2,132 +2,131 @@
 
 [中文](README.md) | English
 
-Smart AC controller for Broadlink RM series — macOS / Windows desktop app + **AI Agent programmable API**.
+Smart AC controller for Broadlink RM series — desktop app + **AI Agent programmable API**. Multi-device, scheduled/adaptive temperature control, dual-source weather alerts, typhoon path map.
 
-> 💡 **Multi-device** · **Daily auto on/off** · **Smart temperature rules** · **Auto-adjust every 2h** · **Weather alerts + typhoon path map** · **Zero-setup Agent API**.
+## 🤖 Agent API
 
 ```python
 from broadlinkac_core import init, send_ac, get_device_list
 
-# One-time setup, auto-persisted to config.json
+# One-time init (auto-persisted to config.json)
 init(api_key="your_key", qw_host="https://your_host",
-     location={"lat": 22.54, "lon": 114.05, "name": "Shenzhen"}, brand="Gree")
+     location={"lat": 22.54, "lon": 114.05, "name": "Shenzhen"})
 
-send_ac("on", "cool", 26, "auto")            # Current device · Cool 26°C
-send_ac("off", "cool", 26, "auto", mac="...") # Specific device · Off
+# Control AC — brand name auto-resolved to IR protocol
+send_ac("on", "cool", 26, "auto")                    # current device
+send_ac("off", "cool", 26, "auto", mac="e870723f")   # specific device
+
+# Multi-device
+for mac, name in get_device_list():
+    print(f"{name}: {mac}")
+
+# Weather data
+from broadlinkac_core import fetch_weather, fetch_weather_alerts
+w = fetch_weather()          # {temp, humidity, condition, ...}
+alerts = fetch_weather_alerts()
 ```
+
+No GUI needed — `pip install -r requirements-core.txt` is enough.
+
+## 🎯 Supported AC Brands
+
+The core supports all **17 protocols** (desktop dropdown shows 10 Chinese brands).
+
+| Brand (CN) | Brand (EN) | Protocol Source |
+|------------|------------|-----------------|
+| 格力 | `gree` | hvac_ir |
+| 美的 / 华凌 / 小米 | `midea` | hvac_ir |
+| 海尔 | `haier` | Custom protocols |
+| 奥克斯 | `aux_ac` | Custom protocols |
+| 海信 | `hisense` | hvac_ir |
+| 大金 | `daikin` | hvac_ir |
+| 三菱 | `mitsubishi` | hvac_ir |
+| 松下 | `panasonic` | Custom protocols |
+| 日立 | `hitachi` | hvac_ir |
+| 富士通 | `fujitsu` | hvac_ir |
+| 巴鲁 | `ballu` | hvac_ir |
+| 开利 | `carriermca` | hvac_ir |
+| 现代 | `hyundai` | hvac_ir |
+| Fuego | `fuego` | hvac_ir |
+
+Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — both resolve automatically. Additional hvac_ir brands not listed (e.g. `carriernqv`, `daikin2`) also work by passing the module name directly.
 
 ## ✨ Features
 
-- 📡 **Multi-device** — LAN auto-discovery, dropdown switch, per-device brand/schedule/rules
-- 🎯 **Multi-brand** — Gree, Midea, Xiaomi, Haier, AUX, Hisense, Daikin, Mitsubishi, Panasonic
-- ⏰ **Scheduled on/off** — Auto power on/off daily, parallel independent scheduling
-- 🌡️ **Temperature rules** — Smart adjustment based on outdoor temp, fully editable
-- 🔄 **Auto-adjust** — Checks outdoor temp every 2h, per-device independent
-- 🌤️ **Dual weather** — Baidu Weather + QWeather API, one-click switch, smart fallback
-- ⚠️ **Alerts** — Local weather warnings + 🌀 **Canvas typhoon path map**, approach/retreat trend
-- 🎨 **Brand logos** — Dynamic brand icon on control panel
-- 🏷️ **Device rename** — Custom nicknames, offline devices auto-labeled
-- 📋 **Activity log** — Daily auto-log, searchable
+- 📡 **Multi-device** — LAN auto-discovery, dropdown switch, offline label
+- ⏰ **Parallel scheduling** — Per-device independent timers and auto-adjust
+- 🌡️ **Temperature rules** — Adaptive cool/heat based on outdoor temp
+- 🌤️ **Dual weather** — Baidu / QWeather API, one-click switch
+- ⚠️ **Alerts + Typhoon** — Local warnings + 🌀 Canvas typhoon path map
+- 🎨 **Brand logos** — Dynamic control panel icon
+- 📋 **Activity log** — Daily auto-logging
 - 🔧 **Diagnostics** — One-click health check
-- 🤖 **Agent-ready** — `import` with zero side effects, `init()` to start
-
-### 🕐 Temperature Rules (default)
-
-| Outdoor Temp | Action | Target |
-|-------------|--------|--------|
-| ≥ 36°C | Cool | 24°C |
-| 33-35°C | Cool | 25°C |
-| 30-32°C | Cool | 26°C |
-| 25-29°C | Cool | 27°C |
-| 18-24°C | Off | — |
-| ≤ 17°C | Heat | 28°C |
 
 ## 🧰 Hardware
 
-- Any device running Python 3.9+ (macOS / Windows / Linux / Raspberry Pi / NAS / server)
-- [Broadlink RM series](https://www.broadlink.com.cn/) IR blaster (RM Mini / RM Pro / RM4 Mini etc.)
-- Supported AC
+- Python 3.9+ (macOS / Windows / Linux / Raspberry Pi / NAS)
+- [Broadlink RM series](https://www.broadlink.com.cn/) IR blaster
 
 ## 🚀 Quick Start
 
-### Option 1: Download (recommended)
+### Desktop App
 
 | Platform | Download |
 |----------|----------|
-| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
 | Windows | [BroadlinkAC-V3A.7z](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
+| macOS | [BroadlinkAC.app.zip](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest) |
 
-On macOS, if Gatekeeper blocks:
+macOS first run:
 ```bash
 xattr -cr /Applications/BroadlinkAC.app
 ```
 
-### Option 2: Run from source
-
+From source:
 ```bash
 git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
 cd BroadlinkAC-For-Agent
 pip install -r requirements.txt
-python3 ac_controller.py
+python ac_controller.py
 ```
 
-### Option 3: Agent / Headless (Linux / Raspberry Pi / Server)
+### Agent / Headless
 
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
-cd BroadlinkAC-For-Agent
 pip install -r requirements-core.txt
 ```
 
 ```python
 from broadlinkac_core import init, send_ac
-
-init(api_key="your_key", qw_host="https://your_host")
+init()
 send_ac("on", "cool", 26, "auto")
-send_ac("on", "heat", 28, "auto", mac="e870723f41ee")  # specific device
 ```
-
-No GUI needed — `broadlinkac_core/` is pure Python, runs on Linux / Ubuntu / Debian / Raspberry Pi.
 
 ## ⚙️ Configuration
 
-Fill in via the Settings menu on first run:
-
-| Field | Description |
-|-------|-------------|
-| Weather API | Baidu (5k/day) or QWeather (50k/mo), free registration |
-| AC Brand | Per-device independent brand selection |
-| Location | Auto-locate or manual city search |
-
-Broadlink device auto-discovered on LAN.
+Fill in weather API key via Settings on first run (Baidu 5k/day or QWeather 50k/mo, free). Broadlink devices auto-discovered on LAN. Agent mode: pass via `init()` or edit `~/.ac_controller/config.json` directly.
 
 ## 📁 Project Structure
 
 ```
 ac_controller.py              # Entry point
-broadlinkac_core/             # Core library (no GUI dep)
+broadlinkac_core/             # Core library (zero GUI deps)
 ├── __init__.py               # Public API
-├── config.py                 # Config + init() + device management
-├── weather.py                # Dual-source weather + alerts
-├── typhoon.py                # Typhoon monitor
-├── ac_control.py             # AC control + IR (mac param)
-├── scheduler.py              # Scheduler + parallel auto-adjust
+├── config.py                 # Config + resolve_brand() + device mgmt
+├── weather.py                # Dual-source weather + alerts + typhoon
+├── ac_control.py             # AC control + dynamic protocol import
+├── scheduler.py              # Multi-device parallel scheduling
 └── logger.py                 # Logging
-broadlinkac_desktop/          # Desktop GUI (cross-platform)
-└── app.py                    # CustomTkinter UI
-protocols/                    # IR protocols (C++ port)
-├── haier.py
-├── aux_ac.py
-└── panasonic.py
-logos/                        # Brand logo images
-requirements.txt
-requirements-core.txt         # Headless mode (no GUI deps)
+broadlinkac_desktop/          # Desktop GUI
+└── app.py
+protocols/                    # Custom IR protocols
+└── haier.py / aux_ac.py / panasonic.py
+logos/                        # Brand logos
 ```
 
 ## 🔐 Privacy
 
-All config stored locally in `~/.ac_controller/`. Nothing uploaded. Weather and typhoon data fetched directly from official APIs.
+All config stored locally at `~/.ac_controller/`. Nothing uploaded.
 
 ## 📜 License
 
@@ -135,9 +134,8 @@ MIT License
 
 ## 💝 Acknowledgments
 
-- [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ reference for Haier/AUX/Panasonic IR protocols
-- [python-broadlink](https://github.com/mjg59/python-broadlink) — Broadlink RM device Python driver
-- [hvac_ir](https://github.com/nicko858/hvac_ir) — Gree/Midea/Hisense/Daikin/Mitsubishi IR protocol library
-- [QWeather](https://www.qweather.com) — Weather and alert data
-- [Baidu Maps](https://lbsyun.baidu.com) — Weather API
-- [China NMC](https://www.nmc.cn) — Typhoon monitoring data
+- [python-broadlink](https://github.com/mjg59/python-broadlink) — Broadlink RM driver
+- [hvac_ir](https://github.com/nicko858/hvac_ir) — IR protocol library
+- [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ protocol reference
+- [QWeather](https://www.qweather.com) / [Baidu Maps](https://lbsyun.baidu.com) — Weather data
+- [China NMC](https://www.nmc.cn) — Typhoon data
