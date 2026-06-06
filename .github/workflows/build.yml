@@ -23,8 +23,6 @@ jobs:
           pip install -r requirements.txt pyinstaller
           pyinstaller --noconsole --onedir --name BroadlinkAC \
             --hidden-import protocols.haier --hidden-import protocols.aux_ac --hidden-import protocols.panasonic \
-            --hidden-import hvac_ir.gree --hidden-import hvac_ir.midea --hidden-import hvac_ir.hisense \
-            --hidden-import hvac_ir.daikin --hidden-import hvac_ir.mitsubishi \
             --add-data "protocols:protocols" --add-data "logos:logos" ac_controller.py
           cd dist && tar czf ../BroadlinkAC-linux.tar.gz BroadlinkAC
       - uses: actions/upload-artifact@v4
@@ -40,7 +38,8 @@ jobs:
       - run: |
           pip install -r requirements.txt pyinstaller
           pyinstaller BroadlinkAC.spec
-          Compress-Archive -Path dist/BroadlinkAC/* -DestinationPath BroadlinkAC-Windows.zip
+          # spec 生成 onefile → dist/BroadlinkAC.exe
+          Compress-Archive -Path dist/BroadlinkAC.exe -DestinationPath BroadlinkAC-Windows.zip
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-Windows, path: BroadlinkAC-Windows.zip }
 
