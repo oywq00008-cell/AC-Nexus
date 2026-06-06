@@ -25,10 +25,11 @@ send_ac("off", "cool", 26, "auto", mac="e870723f")   # specific device
 for mac, name in get_device_list():
     print(f"{name}: {mac}")
 
-# Weather data
-from broadlinkac_core import fetch_weather, fetch_weather_alerts
-w = fetch_weather()          # {temp, humidity, condition, ...}
-alerts = fetch_weather_alerts()
+# Storm threat assessment
+from broadlinkac_core import typhoon_threat_distance
+dist, name = typhoon_threat_distance()
+if dist < 100:
+    send_ac("off", "cool", 26, "auto", source="typhoon")  # auto-shutdown near storm
 ```
 
 No GUI needed — `pip install -r requirements-core.txt` is enough.
@@ -62,7 +63,9 @@ Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — 
 - ⏰ **Parallel scheduling** — Per-device independent timers and auto-adjust
 - 🌡️ **Temperature rules** — Adaptive cool/heat based on outdoor temp
 - 🌤️ **Dual weather** — Baidu / QWeather API, one-click switch
-- ⚠️ **Alerts + Typhoon** — Local warnings + 🌀 Canvas typhoon path map
+- 🌀 **Dual storm source** — NW Pacific (NMC) + N. Atlantic hurricanes (NHC)
+- 🌪️ **Storm protection** — Auto-shutdown all ACs when storm < 100km
+- ⚠️ **Alerts** — Local warnings with 10-sec auto-dismiss
 - 🎨 **Brand logos** — Dynamic control panel icon
 - 📋 **Activity log** — Daily auto-logging
 - 🔧 **Diagnostics** — One-click health check
