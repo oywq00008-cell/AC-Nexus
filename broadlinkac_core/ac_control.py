@@ -8,9 +8,8 @@ from broadlink.remote import pulses_to_data
 
 import broadlinkac_core.config as _cfg
 
-from broadlinkac_core.config import (
-    AC_BRANDS,
-)
+import broadlinkac_core.config as _cfg
+
 
 # UI 显示用
 MODES = {"制冷": "cool", "制热": "heat", "除湿": "dry", "送风": "fan", "自动": "auto", "关闭": "off"}
@@ -105,10 +104,11 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
     if not mac:
         mac = _cfg.config.get("current_device_mac", "")
     dev = _cfg.config.get("devices", {}).get(mac, {})
-    brand = AC_BRANDS.get(dev.get("brand", "格力"), "gree")
+    brand = _cfg.resolve_brand(dev.get("brand", "格力"))
     t = min(max(temp, 16), 30)
 
-    if brand in ("gree", "midea", "hisense", "daikin", "mitsubishi"):
+    # 优先 hvac_ir（标准化 API），回退自定义 protocols
+    try:
         mod = __import__(f"hvac_ir.{brand}", fromlist=[brand])
         cls_name = brand.capitalize()
         sender = getattr(mod, cls_name)()
@@ -123,7 +123,7 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
         vsw = getattr(sender, "VDIR_SWING", None)
         hsw = getattr(sender, "HDIR_SWING", None)
         sender.send(pwr, m, f, t, vsw, hsw, False)
-    else:
+    except (ModuleNotFoundError, AttributeError):
         mod = __import__(f"protocols.{brand}", fromlist=[brand])
         cls_map = {"haier": "Haier", "aux_ac": "AUX", "panasonic": "Panasonic"}
         cls_name = cls_map.get(brand, brand.capitalize())

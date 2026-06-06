@@ -17,12 +17,27 @@ QW_KEY = ""
 QW_HOST = ""  # 从 config 加载
 AC_BRAND = "gree"
 
-# ── 品牌映射 ──
+# ── 品牌映射（中文/英文 → hvac_ir 或 protocols 模块名）──
 AC_BRANDS = {
     "格力": "gree", "美的": "midea", "海尔": "haier", "华凌": "midea",
     "奥克斯": "aux_ac", "海信": "hisense", "大金": "daikin", "三菱": "mitsubishi",
     "小米": "midea", "松下": "panasonic",
+    "日立": "hitachi", "富士通": "fujitsu", "巴鲁": "ballu",
+    "开利": "carriermca", "现代": "hyundai", "Fuego": "fuego",
 }
+
+
+def resolve_brand(raw):
+    """将任意品牌名（中文/英文）解析为协议模块名。
+    查 AC_BRANDS → 尝试直接当模块名 → 回退 gree。
+    """
+    if not raw:
+        return "gree"
+    key = AC_BRANDS.get(raw) or AC_BRANDS.get(raw.lower()) or AC_BRANDS.get(raw.capitalize())
+    if key:
+        return key
+    # 英文名直接当 hvac_ir 模块名用（如 "hitachi" / "Hitachi"）
+    return raw.lower() if raw.isascii() else "gree"
 
 # ── 默认规则 ──
 DEFAULT_RULES = [
@@ -78,7 +93,7 @@ def apply_config():
         QW_HOST = "https://" + QW_HOST
     LOCATION = config.get("location", {"lat": 39.90, "lon": 116.40, "name": "北京"})
     dev = get_current_device()
-    AC_BRAND = AC_BRANDS.get(dev.get("brand", "格力"), "gree")
+    AC_BRAND = resolve_brand(dev.get("brand", "格力"))
 
 
 def get_current_device():
