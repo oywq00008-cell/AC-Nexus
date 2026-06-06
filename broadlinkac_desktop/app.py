@@ -1157,21 +1157,17 @@ class App(ctk.CTk):
         # ── 底部: 共享设置栏 ──
         bot = ctk.CTkFrame(self.tab_ty, fg_color="transparent")
         bot.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 10))
-        ctk.CTkLabel(bot, text="台风预警距离:").pack(side="left")
-        self.ty_alert_km = ctk.CTkEntry(bot, width=55)
-        self.ty_alert_km.insert(0, str(_cfg.config.get("typhoon_alert_km", 800)))
-        self.ty_alert_km.pack(side="left", padx=5)
-        ctk.CTkLabel(bot, text="km").pack(side="left", padx=(0, 10))
-        self.ty_alert_switch = ctk.CTkSwitch(bot, text="弹窗提醒")
-        self.ty_alert_switch.pack(side="left")
-        if _cfg.config.get("typhoon_alert_enabled", True):
-            self.ty_alert_switch.select()
-        self.ty_ac_off_switch = ctk.CTkSwitch(bot, text="台风临近关空调")
+        km = _cfg.config.get("typhoon_alert_km", 800)
+        status_text = f"风暴预警距离 {km}km 生效中" if _cfg.config.get("typhoon_alert_enabled", True) else f"风暴预警距离 {km}km (提醒已关)"
+        self._ty_status_label = ctk.CTkLabel(bot, text=status_text, font=ctk.CTkFont(size=13), text_color="gray")
+        self._ty_status_label.pack(side="left")
+        ctk.CTkButton(bot, text="修改", width=50, fg_color="#555",
+                      command=self._edit_ty_alert).pack(side="left", padx=8)
+        self.ty_ac_off_switch = ctk.CTkSwitch(bot, text="风暴<100km关闭所有空调",
+                                               command=self._on_ac_off_toggle)
         self.ty_ac_off_switch.pack(side="left", padx=5)
         if _cfg.config.get("typhoon_ac_off", True):
             self.ty_ac_off_switch.select()
-        ctk.CTkButton(bot, text="💾 保存", width=60, fg_color="#666",
-                      command=self._save_ty_settings).pack(side="left", padx=8)
         ctk.CTkButton(bot, text="🌍 卫星云图", fg_color="#555", width=80,
                       command=self._open_zoom_earth).pack(side="right", padx=3)
         self.ty_time_label = ctk.CTkLabel(bot, text="", font=ctk.CTkFont(size=13), text_color="gray")
@@ -1266,15 +1262,73 @@ class App(ctk.CTk):
         self._alert_page += 1
         self._do_render_alerts()
 
-    def _save_ty_settings(self):
-        try:
-            _cfg.config["typhoon_alert_km"] = int(self.ty_alert_km.get())
-        except:
-            _cfg.config["typhoon_alert_km"] = 800
-        _cfg.config["typhoon_alert_enabled"] = bool(self.ty_alert_switch.get())
-        _cfg.config["typhoon_ac_off"] = bool(self.ty_ac_off_switch.get())
+    def _update_ty_status(self):
+        """刷新底栏预警距离状态文字"""
+        km = _cfg.config.get("typhoon_alert_km", 800)
+        if _cfg.config.get("typhoon_alert_enabled", True):
+            self._ty_status_label.configure(text=f"风暴预警距离 {km}km 生效中")
+        else:
+            self._ty_status_label.configure(text=f"风暴预警距离 {km}km (提醒已关)")
+
+    def _edit_ty_alert(self):
+        """弹出窗口修改预警距离和弹窗提醒"""
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("修改预警设置")
+        self._center_on_parent(dlg, 320, 180)
+        dlg.transient(self)
+
+        # 距离
+        row1 = ctk.CTkFrame(dlg, fg_color="transparent")
+        row1.pack(fill="x", padx=15, pady=(15, 5))
+        ctk.CTkLabel(row1, text="预警距离:").pack(side="left")
+        entry = ctk.CTkEntry(row1, width=80)
+        entry.insert(0, str(_cfg.config.get("typhoon_alert_km", 800)))
+        entry.pack(side="left", padx=5)
+        ctk.CTkLabel(row1, text="km").pack(side="left")
+
+        # 弹窗开关
+        row2 = ctk.CTkFrame(dlg, fg_color="transparent")
+        row2.pack(fill="x", padx=15, pady=10)
+        alert_sw = ctk.CTkSwitch(row2, text="弹窗提醒")
+        alert_sw.pack(side="left")
+        if _cfg.config.get("typhoon_alert_enabled", True):
+            alert_sw.select()
+
+        def do_save():
+            try:
+                _cfg.config["typhoon_alert_km"] = int(entry.get())
+            except:
+                _cfg.config["typhoon_alert_km"] = 800
+            _cfg.config["typhoon_alert_enabled"] = bool(alert_sw.get())
+            save_config(_cfg.config)
+            self._update_ty_status()
+            dlg.destroy()
+            write_log("系统", "台风预警设置已更新")
+
+        ctk.CTkButton(dlg, text="保存", command=do_save, fg_color="#4A90D9",
+                      width=80).pack(side="left", padx=(80, 10), pady=(0, 10))
+        ctk.CTkButton(dlg, text="取消", command=dlg.destroy, fg_color="#555",
+                      width=80).pack(side="left", pady=(0, 10))
+
+    def _on_ac_off_toggle(self):
+        """关闭风暴自动关机开关时弹出安全警示确认"""
+        if self.ty_ac_off_switch.get():
+            # 用户打开了 → 直接保存
+            _cfg.config["typhoon_ac_off"] = True
+            save_config(_cfg.config)
+            return
+        # 用户关闭了 → 确认对话框
+        if not messagebox.askyesno("⚠️ 安全警示",
+            "当风暴<100km时，说明你已经处于风暴核心影响圈，\n"
+            "此时大风可能导致空调外机的风扇倒转，导致烧毁，\n"
+            "电涌可能击毁空调硬件。\n\n"
+            "确定关闭吗？",
+            parent=self):
+            # 用户取消 → 恢复为开启
+            self.ty_ac_off_switch.select()
+            return
+        _cfg.config["typhoon_ac_off"] = False
         save_config(_cfg.config)
-        write_log("系统", "台风预警设置已更新")
 
     def _save_adjust(self):
         """保存自动调温开关状态"""
