@@ -1456,13 +1456,18 @@ class App(ctk.CTk):
 
     def _fetch_all(self):
         """获取天气+预警数据，写入缓存（台风走30分钟调度器）"""
-        self._weather_data = fetch_weather()
-        if self._weather_data:
-            try:
-                _cfg._cached_temp = float(self._weather_data["temp"])
-            except (ValueError, TypeError, KeyError):
-                pass
-        self._alerts_data, self._alerts_provider = fetch_weather_alerts()
+        try:
+            self._weather_data = fetch_weather()
+            if self._weather_data:
+                try:
+                    _cfg._cached_temp = float(self._weather_data["temp"])
+                except (ValueError, TypeError, KeyError):
+                    pass
+            self._alerts_data, self._alerts_provider = fetch_weather_alerts()
+        except Exception as e:
+            self._weather_data = None
+            self._alerts_data, self._alerts_provider = [], "baidu"
+            print(f"[天气数据] 获取失败: {e}")
 
     def _fetch_weather_all(self):
         """手动刷新天气+预警 → 渲染 → 重设计时器"""
@@ -1504,10 +1509,13 @@ class App(ctk.CTk):
 
     def _render_all(self):
         """从缓存渲染天气+预警卡片（台风走独立轮询）"""
-        self._render_weather()
-        self._render_alerts()
-        self._update_brand_logo()
-        self._update_alert_source()
+        try:
+            self._render_weather()
+            self._render_alerts()
+            self._update_brand_logo()
+            self._update_alert_source()
+        except Exception as e:
+            print(f"[渲染] {e}")
 
     def _render_weather(self):
         """从缓存渲染天气卡片"""
