@@ -1,0 +1,69 @@
+name: Build All Platforms
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  # ── Linux .deb ──
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          sudo apt-get update && sudo apt-get install -y python3-tk
+          pip install -r requirements.txt pyinstaller
+          pyinstaller --noconsole --onedir --name BroadlinkAC \
+            --hidden-import protocols.haier --hidden-import protocols.aux_ac --hidden-import protocols.panasonic \
+            --hidden-import hvac_ir.gree --hidden-import hvac_ir.midea --hidden-import hvac_ir.hisense \
+            --hidden-import hvac_ir.daikin --hidden-import hvac_ir.mitsubishi \
+            --add-data "protocols:protocols" --add-data "logos:logos" ac_controller.py
+          cd dist && tar czf ../BroadlinkAC-linux.tar.gz BroadlinkAC
+      - uses: actions/upload-artifact@v4
+        with: { name: BroadlinkAC-linux, path: BroadlinkAC-linux.tar.gz }
+
+  # ── Windows .exe ──
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          pip install -r requirements.txt pyinstaller
+          pyinstaller BroadlinkAC.spec
+          Compress-Archive -Path dist/BroadlinkAC/* -DestinationPath BroadlinkAC-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: BroadlinkAC-Windows, path: BroadlinkAC-Windows.zip }
+
+  # ── macOS .app ──
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          pip install -r requirements.txt pyinstaller
+          pyinstaller BroadlinkAC-macOS.spec
+          cd dist && zip -r ../BroadlinkAC-macOS.zip BroadlinkAC.app
+      - uses: actions/upload-artifact@v4
+        with: { name: BroadlinkAC-macOS, path: BroadlinkAC-macOS.zip }
+
+  # ── 打 tag 时自动创建 Release ──
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'BroadlinkAC-*', merge-multiple: true, path: artifacts }
+      - run: ls -lh artifacts/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
