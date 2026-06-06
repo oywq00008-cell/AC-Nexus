@@ -1370,71 +1370,79 @@ class App(ctk.CTk):
 
     def _do_ty_fetch(self):
         """后台线程：根据 typhoon_provider 拉数据 → 写缓存"""
-        provider = _cfg.config.get("typhoon_provider", "nmc")
-        if provider == "nhc":
-            cycs = fetch_nhc_storms()
-        else:
-            cycs = []
-            for t in fetch_typhoons():
-                d = fetch_typhoon_detail(t["id"])
-                if d:
-                    cycs.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"],
-                                 "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
-        self._ty_data = cycs
+        try:
+            provider = _cfg.config.get("typhoon_provider", "nmc")
+            if provider == "nhc":
+                cycs = fetch_nhc_storms()
+            else:
+                cycs = []
+                for t in fetch_typhoons():
+                    d = fetch_typhoon_detail(t["id"])
+                    if d:
+                        cycs.append({"id": t["id"], "eng": t["eng"], "cn": t["cn"],
+                                     "code": t.get("code", ""), "meaning": t.get("meaning", ""), "detail": d})
+            self._ty_data = cycs
+        except Exception as e:
+            self._ty_data = []
+            print(f"[台风数据] 获取失败: {e}")
         self.after(0, self._ty_cycle_render)
 
     def _ty_cycle_render(self):
         """主线程：渲染台风卡片 → 判断预警弹窗 + 自动关空调 → 重设计时器"""
-        self._render_typhoon()
+        try:
+            self._render_typhoon()
 
-        cycs = self._ty_data
-        alert_km = _cfg.config.get("typhoon_alert_km", 800)
+            cycs = self._ty_data
+            alert_km = _cfg.config.get("typhoon_alert_km", 800)
 
-        # 遍历弹窗（每场风暴不管远近都可能触发）
-        for t in cycs:
-            detail = t.get("detail")
-            if not detail:
-                continue
-            dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
-                                 detail["lat"], detail["lon"])
-            if (dist < alert_km
-                    and _cfg.config.get("typhoon_alert_enabled", True)
-                    and not self._ty_alert_muted):
-                self._show_ty_alert(detail, dist)
+            # 遍历弹窗
+            for t in cycs:
+                detail = t.get("detail")
+                if not detail:
+                    continue
+                dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
+                                     detail["lat"], detail["lon"])
+                if (dist < alert_km
+                        and _cfg.config.get("typhoon_alert_enabled", True)
+                        and not self._ty_alert_muted):
+                    self._show_ty_alert(detail, dist)
 
-        # 自动关空调：用核心函数获取最近风暴距离
-        min_dist, nearest_name = typhoon_threat_distance()
-        if _cfg.config.get("typhoon_ac_off", True):
-            if min_dist < 100 and not self._ty_ac_off_sent:
-                self._ty_ac_off_sent = True
-                offline_count = 0
-                off_count = 0
-                for mac, dev in _cfg.config.get("devices", {}).items():
-                    name = dev.get("name", mac[:8])
-                    if not _cfg._online_macs or mac not in _cfg._online_macs:
-                        offline_count += 1
-                        continue
-                    try:
-                        send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
-                        write_log("空调", f"🌀 台风靠近（距{min_dist}km）→ [{name}] 已自动关机")
-                        off_count += 1
-                    except Exception as e:
-                        write_log("系统", f"台风关机失败 [{name}]: {e}")
-                write_log("系统", f"🌀 台风自动关机完成: 关闭 {off_count} 台, 离线 {offline_count} 台")
-            elif min_dist >= 100:
-                self._ty_ac_off_sent = False
+            # 自动关空调
+            min_dist, nearest_name = typhoon_threat_distance()
+            if _cfg.config.get("typhoon_ac_off", True):
+                if min_dist < 100 and not self._ty_ac_off_sent:
+                    self._ty_ac_off_sent = True
+                    offline_count = 0
+                    off_count = 0
+                    for mac, dev in _cfg.config.get("devices", {}).items():
+                        name = dev.get("name", mac[:8])
+                        if not _cfg._online_macs or mac not in _cfg._online_macs:
+                            offline_count += 1
+                            continue
+                        try:
+                            send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
+                            write_log("空调", f"🌀 台风靠近（距{min_dist}km）→ [{name}] 已自动关机")
+                            off_count += 1
+                        except Exception as e:
+                            write_log("系统", f"台风关机失败 [{name}]: {e}")
+                    write_log("系统", f"🌀 台风自动关机完成: 关闭 {off_count} 台, 离线 {offline_count} 台")
+                elif min_dist >= 100:
+                    self._ty_ac_off_sent = False
 
-        # 日志
-        for t in cycs:
-            detail = t.get("detail")
-            if not detail:
-                continue
-            dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
-                                 detail["lat"], detail["lon"])
-            status = "⚠️ 预警" if dist < alert_km else "✅ 安全"
-            write_log("台风", f"{detail['cn']} ({detail['eng']}) {detail['cat']} 距{dist}km {status}")
+            # 日志
+            for t in cycs:
+                detail = t.get("detail")
+                if not detail:
+                    continue
+                dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
+                                     detail["lat"], detail["lon"])
+                status = "⚠️ 预警" if dist < alert_km else "✅ 安全"
+                write_log("台风", f"{detail['cn']} ({detail['eng']}) {detail['cat']} 距{dist}km {status}")
 
-        self._schedule_ty_next()
+        except Exception as e:
+            write_log("系统", f"[台风周期] 异常: {e}")
+        finally:
+            self._schedule_ty_next()
 
     def _schedule_ty_next(self):
         """30 分钟后再次触发台风数据获取"""

@@ -113,29 +113,34 @@ def typhoon_threat_distance(provider=None):
     """评估最近风暴/飓风距离 (km)。
     Agent 可直接调用：<100km 即应关机。返回 (距离, 名称)。
     provider 不传则走 config 当前设置。
+    任何异常均返回 (99999, "")，不抛异常。
     """
     import broadlinkac_core.config as _cfg
-    provider = provider or _cfg.config.get("typhoon_provider", "nmc")
-    lat = _cfg.LOCATION["lat"]
-    lon = _cfg.LOCATION["lon"]
-    min_dist, name = 99999, ""
+    try:
+        provider = provider or _cfg.config.get("typhoon_provider", "nmc")
+        lat = _cfg.LOCATION["lat"]
+        lon = _cfg.LOCATION["lon"]
+        min_dist, name = 99999, ""
 
-    if provider == "nhc":
-        storms = fetch_nhc_storms()
-        for s in storms:
-            d = s.get("detail", {})
-            if d:
-                dist = calc_distance(lat, lon, d["lat"], d["lon"])
-                if dist < min_dist:
-                    min_dist, name = dist, d["cn"]
-    else:
-        for t in fetch_typhoons():
-            d = fetch_typhoon_detail(t["id"])
-            if d:
-                dist = calc_distance(lat, lon, d["lat"], d["lon"])
-                if dist < min_dist:
-                    min_dist, name = dist, d["cn"]
-    return min_dist, name
+        if provider == "nhc":
+            storms = fetch_nhc_storms()
+            for s in storms:
+                d = s.get("detail", {})
+                if d:
+                    dist = calc_distance(lat, lon, d["lat"], d["lon"])
+                    if dist < min_dist:
+                        min_dist, name = dist, d["cn"]
+        else:
+            for t in fetch_typhoons():
+                d = fetch_typhoon_detail(t["id"])
+                if d:
+                    dist = calc_distance(lat, lon, d["lat"], d["lon"])
+                    if dist < min_dist:
+                        min_dist, name = dist, d["cn"]
+        return min_dist, name
+    except Exception as e:
+        print(f"[威胁评估] {e}")
+        return 99999, ""
 
 
 # ── NHC 飓风数据源 ──
