@@ -34,6 +34,8 @@ if dist < 100:
 
 Agent 无需 GUI，`pip install -r requirements-core.txt` 即可。
 
+> `send_ac` 仅保证开关/模式/温度/风速四个通用能力。若你的空调支持强力、扫风等高级功能，可让 Agent 修改 `broadlinkac_core/ac_control.py` 添加可选参数透传。
+
 ## 🎯 支持的空调品牌
 
 核心支持全部 **17 种** 协议（桌面端下拉菜单显示其中 10 个中文品牌）。
@@ -123,15 +125,20 @@ ac_controller.py              # 入口
 broadlinkac_core/             # 核心库（零 GUI 依赖）
 ├── __init__.py               # 公共 API
 ├── config.py                 # 配置 + resolve_brand() + 设备管理
-├── weather.py                # 双源天气 + 预警 + 台风
+├── weather.py                # 双源天气 + 预警
+├── typhoon.py                # 台风（NMC）+ 飓风（NHC）+ 威胁评估
 ├── ac_control.py             # 空调控制 + 动态协议导入
-├── scheduler.py              # 多设备并行定时调度
+├── scheduler.py              # 定时调度
 └── logger.py                 # 日志
 broadlinkac_desktop/          # 桌面 GUI
 └── app.py
-protocols/                    # 自研红外协议
-└── haier.py / aux_ac.py / panasonic.py
+protocols/                    # 自研红外协议 (haier/aux_ac/panasonic)
 logos/                        # 品牌 Logo
+assets/                       # 截图
+skill/                        # Agent Skill 定义 (SKILL.md)
+BroadlinkAC.spec              # PyInstaller 打包配置
+requirements.txt              # 完整依赖
+requirements-core.txt         # Agent 最小依赖
 ```
 
 ## 🔐 隐私

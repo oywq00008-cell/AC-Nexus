@@ -34,6 +34,8 @@ if dist < 100:
 
 No GUI needed — `pip install -r requirements-core.txt` is enough.
 
+> `send_ac` only guarantees power/mode/temp/fan — the minimum common set across all brands. If your AC supports turbo, swing, etc., your Agent can extend `broadlinkac_core/ac_control.py` with optional parameters.
+
 ## 🎯 Supported AC Brands
 
 The core supports all **17 protocols** (desktop dropdown shows 10 Chinese brands).
@@ -123,15 +125,20 @@ ac_controller.py              # Entry point
 broadlinkac_core/             # Core library (zero GUI deps)
 ├── __init__.py               # Public API
 ├── config.py                 # Config + resolve_brand() + device mgmt
-├── weather.py                # Dual-source weather + alerts + typhoon
+├── weather.py                # Dual-source weather + alerts
+├── typhoon.py                # Typhoon (NMC) + Hurricane (NHC) + threat eval
 ├── ac_control.py             # AC control + dynamic protocol import
-├── scheduler.py              # Multi-device parallel scheduling
+├── scheduler.py              # Scheduling
 └── logger.py                 # Logging
 broadlinkac_desktop/          # Desktop GUI
 └── app.py
-protocols/                    # Custom IR protocols
-└── haier.py / aux_ac.py / panasonic.py
+protocols/                    # Custom IR protocols (haier/aux_ac/panasonic)
 logos/                        # Brand logos
+assets/                       # Screenshots
+skill/                        # Agent Skill definition (SKILL.md)
+BroadlinkAC.spec              # PyInstaller config
+requirements.txt              # Full deps
+requirements-core.txt         # Agent-only deps
 ```
 
 ## 🔐 Privacy
