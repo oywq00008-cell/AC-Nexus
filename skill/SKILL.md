@@ -132,7 +132,7 @@ if w:
 from broadlinkac_core import init, fetch_weather, fetch_weather_alerts
 init()
 w = fetch_weather()
-alerts = fetch_weather_alerts()
+alerts, provider = fetch_weather_alerts()
 for a in alerts:
     print(f"[{a['severity']}] {a['headline']}")
 ```
