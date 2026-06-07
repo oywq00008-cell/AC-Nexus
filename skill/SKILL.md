@@ -56,6 +56,8 @@ if dist < 100:
 | `decide_ac(outdoor_temp)` | Run temperature rules → returns `(target_temp, mode)` |
 | `get_device()` | Get connected Broadlink device |
 
+> **Extending `send_ac` for advanced features**: `send_ac` intentionally covers only the minimum common set (power/mode/temp/fan) that works on **all** AC brands. If your specific AC supports turbo, swing, eco, sleep, etc., your Agent can modify `broadlinkac_core/ac_control.py` to add optional parameters (`turbo=True`, `swing_v="swing"`, etc.) and pass them through to the underlying protocol. Back up the file before editing — changes are local and won't affect the core library.
+
 ### Weather & Alerts (Dual Source)
 | Function | Description |
 |----------|-------------|
