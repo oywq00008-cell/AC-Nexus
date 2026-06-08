@@ -926,16 +926,16 @@ class App(ctk.CTk):
         self.min_combo.pack(side="left", padx=2)
         ctk.CTkLabel(srow, text="分").pack(side="left")
 
-        srow2 = ctk.CTkFrame(sched_card, fg_color="transparent")
-        srow2.pack(anchor="center", padx=12, pady=2)
-        self.sched_switch = ctk.CTkSwitch(srow2, text="启用定时")
-        self.sched_switch.pack(side="left")
-        if _cfg.config.get("schedule_enabled"):
-            self.sched_switch.select()
-
         self.sched_status = ctk.CTkLabel(sched_card, text="", font=ctk.CTkFont(size=10))
         self.sched_status.pack(anchor="center", padx=12, pady=(1, 0))
         self._update_sched_status()
+
+        srow2 = ctk.CTkFrame(sched_card, fg_color="transparent")
+        srow2.pack(anchor="center", padx=12, pady=2)
+        self.sched_switch = ctk.CTkSwitch(srow2, text="定时开机")
+        self.sched_switch.pack(side="left")
+        if _cfg.config.get("schedule_enabled"):
+            self.sched_switch.select()
 
         ctk.CTkLabel(sched_card, text="── 定时关机 ──", font=ctk.CTkFont(size=10), text_color="#888").pack(
             anchor="center", pady=(8, 2))
@@ -956,16 +956,16 @@ class App(ctk.CTk):
         self.off_min_combo.pack(side="left", padx=2)
         ctk.CTkLabel(off_row, text="分").pack(side="left")
 
-        off_row2 = ctk.CTkFrame(sched_card, fg_color="transparent")
-        off_row2.pack(anchor="center", padx=12, pady=2)
-        self.off_switch = ctk.CTkSwitch(off_row2, text="启用关机定时")
-        self.off_switch.pack(side="left")
-        if _cfg.config.get("off_enabled"):
-            self.off_switch.select()
-
         self.off_status = ctk.CTkLabel(sched_card, text="", font=ctk.CTkFont(size=10))
         self.off_status.pack(anchor="center", padx=12, pady=(1, 0))
         self._update_off_status()
+
+        off_row2 = ctk.CTkFrame(sched_card, fg_color="transparent")
+        off_row2.pack(anchor="center", padx=12, pady=2)
+        self.off_switch = ctk.CTkSwitch(off_row2, text="定时关机")
+        self.off_switch.pack(side="left")
+        if _cfg.config.get("off_enabled"):
+            self.off_switch.select()
 
         btn_row = ctk.CTkFrame(sched_card, fg_color="transparent")
         btn_row.pack(anchor="center", padx=12, pady=(5, 10))
