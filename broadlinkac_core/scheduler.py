@@ -63,6 +63,10 @@ def scheduled_off_job(mac):
     if not _device_online(mac):
         write_log("系统", f"⏰ [{name}] 定时关机 → 设备离线，跳过")
         return None
+    # 检测空调状态：已关则跳过
+    state = get_last_ac_state()
+    if state["power"] == "off":
+        return None
     # 台风保护：已被台风关机的跳过
     from broadlinkac_core.typhoon import typhoon_threat_distance
     min_dist, _ = typhoon_threat_distance()
