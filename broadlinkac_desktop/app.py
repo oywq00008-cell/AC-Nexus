@@ -31,7 +31,7 @@ from broadlinkac_core.weather import fetch_weather, city_lookup, fetch_weather_a
 from broadlinkac_core.typhoon import fetch_typhoons, fetch_typhoon_detail, fetch_nhc_storms, calc_distance, typhoon_threat_distance, fetch_and_cache, get_cached, judge_and_shutdown
 from broadlinkac_core.logger import write_log, read_log, get_log_dates
 from broadlinkac_core.scheduler import (
-    _sched_lock, scheduled_job, register_all_jobs,
+    _sched_lock, register_all_jobs,
 )
 
 APP_NAME = "BroadlinkAC"
@@ -971,8 +971,6 @@ class App(ctk.CTk):
         btn_row.pack(anchor="center", padx=12, pady=(5, 10))
         ctk.CTkButton(btn_row, text="💾 保存", width=65, fg_color="#666",
                       command=self._save_schedule).pack(side="left", padx=(0, 5))
-        ctk.CTkButton(btn_row, text="▶ 立即执行", width=85, fg_color="#E67E22",
-                      command=self._trigger_now).pack(side="left")
 
         # 右下: 规则
         rule_card = ctk.CTkFrame(grid_frame)
@@ -1811,19 +1809,6 @@ class App(ctk.CTk):
                   f"关机 {_cfg.config['off_time']} {'(启用)' if _cfg.config.get('off_enabled') else '(停用)'}")
         self._update_sched_status()
         self._update_off_status()
-
-    def _trigger_now(self):
-        try:
-            result = scheduled_job()
-            if result:
-                self.send_status.configure(text=f"✅ {result}", text_color="#27AE60")
-            else:
-                self.send_status.configure(text="⏸️ 规则判定无需操作", text_color="gray")
-                write_log("系统", "手动触发: 规则判定无需操作或天气获取失败")
-        except Exception as e:
-            self.send_status.configure(text=f"❌ {e}", text_color="#E74C3C")
-            write_log("系统", f"手动触发失败: {e}")
-        self.after(3000, lambda: self.send_status.configure(text=""))
 
     def _render_typhoon(self):
         """从缓存渲染台风面板（每页2条）"""
