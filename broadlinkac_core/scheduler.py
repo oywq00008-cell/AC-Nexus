@@ -131,9 +131,16 @@ def scheduler_loop():
     while True:
         with _sched_lock:
             sch.run_pending()
-        time.sleep(15)
+        time.sleep(max(sch.idle_seconds(), 0) if sch.idle_seconds() is not None else 15)
+
+
+_sched_started = False
 
 
 def start_scheduler():
-    """启动后台调度线程"""
+    """启动后台调度线程（幂等，仅首次调用生效）"""
+    global _sched_started
+    if _sched_started:
+        return
+    _sched_started = True
     threading.Thread(target=scheduler_loop, daemon=True).start()

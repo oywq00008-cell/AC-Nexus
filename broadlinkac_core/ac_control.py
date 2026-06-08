@@ -8,8 +8,6 @@ from broadlink.remote import pulses_to_data
 
 import broadlinkac_core.config as _cfg
 
-import broadlinkac_core.config as _cfg
-
 
 # UI 显示用
 MODES = {"制冷": "cool", "制热": "heat", "除湿": "dry", "送风": "fan", "自动": "auto", "关闭": "off"}
