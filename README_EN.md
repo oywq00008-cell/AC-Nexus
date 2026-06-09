@@ -77,6 +77,14 @@ Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — 
 - Python 3.9+ (macOS / Windows / Linux / Raspberry Pi / NAS)
 - [Broadlink RM series](https://www.broadlink.com.cn/) IR blaster
 
+## 📡 Deploy on OpenWRT Router
+
+Want **24/7 headless operation** (router daemon, typhoon auto-protection, auto-adjust)? Check out the sister project:
+
+> **[BroadlinkAC-OpenWRT](https://github.com/oywq00008-cell/BroadlinkAC-OpenWRT)** — LuCI control panel + procd daemon + IPK one-click install
+
+Both projects share the core algorithm and IR protocols, but evolve independently: desktop focuses on user interaction, router focuses on safe degradation.
+
 ## 🚀 Quick Start
 
 ### Desktop App
