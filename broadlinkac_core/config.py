@@ -138,9 +138,13 @@ def _save_flat_to_device(mac):
 def _load_device_to_flat(mac):
     """将 devices[mac] 键展平到 config 根级"""
     dev = config.get("devices", {}).get(mac, {})
+    DEFAULTS = {
+        "trigger_time": "12:00", "schedule_enabled": True,
+        "off_time": "22:00", "off_enabled": False,
+        "auto_adjust": True, "temp_rules": [[36,99,24,"cool"],[33,35,25,"cool"],[30,32,26,"cool"],[25,29,27,"cool"],[18,24,0,"off"],[0,17,28,"heat"]],
+    }
     for k in DEVICE_KEYS:
-        if k in dev:
-            config[k] = dev[k]
+        config[k] = dev.get(k, DEFAULTS.get(k)) if k in DEFAULTS else dev.get(k, "")
 
 
 def add_or_update_device(mac, info):
@@ -152,8 +156,18 @@ def add_or_update_device(mac, info):
     if mac in config["devices"]:
         old_name = config["devices"][mac].get("name", "")
         if old_name:
-            info = dict(info)  # 不污染调用方
+            info = dict(info)
             info.pop("name", None)
+    else:
+        # 新设备：同名加序号
+        base = info.get("name", "")
+        exist_names = [d.get("name","") for d in config["devices"].values()]
+        if base in exist_names:
+            n = 2
+            while f"{base} {n}" in exist_names:
+                n += 1
+            info = dict(info)
+            info["name"] = f"{base} {n}"
     existing.update(info)
     config["devices"][mac] = existing
     if not config.get("current_device_mac"):

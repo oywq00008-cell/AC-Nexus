@@ -89,7 +89,7 @@ def get_device(mac=None):
     _cfg.add_or_update_device(new_mac, {
         "host": d.host[0] if isinstance(d.host, tuple) else str(d.host),
         "port": d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80,
-        "mac": new_mac, "model": d.model, "name": d.name,
+        "mac": new_mac, "model": d.model, "name": d.model or d.name,
     })
     _cfg.save_config(_cfg.config)
     return d

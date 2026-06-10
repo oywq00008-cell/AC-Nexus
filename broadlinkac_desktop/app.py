@@ -414,7 +414,7 @@ class App(ctk.CTk):
             add_or_update_device(mac, {
                 "host": d.host[0] if isinstance(d.host, tuple) else str(d.host),
                 "port": d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80,
-                "mac": mac, "model": d.model, "name": d.name,
+                "mac": mac, "model": d.model, "name": d.model or d.name,
             })
         save_config(_cfg.config)
         apply_config()
@@ -908,7 +908,7 @@ class App(ctk.CTk):
         ctk.CTkLabel(sched_card, text="⏰ 定时设置", font=ctk.CTkFont(size=14, weight="bold")).pack(
             anchor="center", padx=12, pady=(10, 5))
 
-        trigger_parts = _cfg.config["trigger_time"].split(":")
+        trigger_parts = _cfg.config.get("trigger_time", "12:00").split(":")
         trig_h = trigger_parts[0] if len(trigger_parts) > 0 else "12"
         trig_m = trigger_parts[1] if len(trigger_parts) > 1 else "00"
 
@@ -1000,7 +1000,7 @@ class App(ctk.CTk):
     def _refresh_rules_display(self):
         for w in self.rules_frame.winfo_children():
             w.destroy()
-        for low, high, target, mode in _cfg.config["temp_rules"]:
+        for low, high, target, mode in _cfg.config.get("temp_rules", [[36,99,24,"cool"],[33,35,25,"cool"],[30,32,26,"cool"],[25,29,27,"cool"],[18,24,0,"off"],[0,17,28,"heat"]]):
             if mode == "off":
                 text = f"  室外 {low}-{high}°C → 关闭"
             else:
@@ -1010,7 +1010,7 @@ class App(ctk.CTk):
 
     def _update_sched_status(self):
         if _cfg.config.get("schedule_enabled"):
-            t = _cfg.config["trigger_time"]
+            t = _cfg.config.get("trigger_time", "12:00")
             self.sched_status.configure(text=f"✅ 开机定时已开启 · 每天 {t}", text_color="#27AE60")
         else:
             self.sched_status.configure(text="⏸️ 开机定时已关闭", text_color="gray")
@@ -1033,7 +1033,7 @@ class App(ctk.CTk):
         scroll = ctk.CTkScrollableFrame(dlg, height=280)
         scroll.pack(fill="both", expand=True, padx=15, pady=(15, 5))
 
-        for i, (low, high, target, mode) in enumerate(_cfg.config["temp_rules"]):
+        for i, (low, high, target, mode) in enumerate(_cfg.config.get("temp_rules", [[36,99,24,"cool"],[33,35,25,"cool"],[30,32,26,"cool"],[25,29,27,"cool"],[18,24,0,"off"],[0,17,28,"heat"]])):
             row = ctk.CTkFrame(scroll, fg_color="transparent")
             row.pack(fill="x", pady=3)
             ctk.CTkLabel(row, text=f"规则{i + 1}:", width=50).pack(side="left")
@@ -1602,7 +1602,7 @@ class App(ctk.CTk):
                         mac_hex = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
                         add_or_update_device(mac_hex, {
                             "host": new_ip, "port": d.host[1],
-                            "mac": mac_hex, "model": d.model, "name": d.name,
+                            "mac": mac_hex, "model": d.model, "name": d.model or d.name,
                         })
                         save_config(_cfg.config)
                         if ip_changed:
