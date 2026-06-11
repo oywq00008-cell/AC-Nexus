@@ -118,14 +118,79 @@ def auto_adjust_job(mac):
         write_log("系统", f"自动调温失败: {e}")
 
 
+def _scheduled_on_wrapper(mac, days):
+    """仅在指定星期几执行开机"""
+    if datetime.now().isoweekday() in days:
+        return scheduled_job(mac)
+
+
+def _scheduled_off_wrapper(mac, days):
+    """仅在指定星期几执行关机"""
+    if datetime.now().isoweekday() in days:
+        return scheduled_off_job(mac)
+
+
+def _migrate_schedule_config():
+    """将旧字段迁移到模板结构（自动执行一次）"""
+    if _cfg.config.get("_schedule_migrated"):
+        return
+    old_trigger = _cfg.config.get("trigger_time")
+    old_off = _cfg.config.get("off_time")
+    old_on_enabled = _cfg.config.get("schedule_enabled", False)
+    old_off_enabled = _cfg.config.get("off_enabled", False)
+    if old_trigger or old_off:
+        slots = []
+        if old_on_enabled and old_trigger:
+            slots.append({"on": old_trigger, "off": old_off if old_off_enabled else None})
+        elif old_off_enabled and old_off:
+            slots.append({"on": old_off, "off": None})
+        if slots:
+            _cfg.config.setdefault("schedule_templates", {})["默认"] = {
+                "groups": [{"days": [1, 2, 3, 4, 5, 6, 7], "slots": slots}]
+            }
+            mac = _cfg.config.get("current_device_mac")
+            if mac:
+                _cfg.config.setdefault("devices", {}).setdefault(mac, {})["active_template"] = "默认"
+        for k in ("trigger_time", "off_time", "schedule_enabled", "off_enabled"):
+            _cfg.config.pop(k, None)
+    # 迁移旧 days/slots 结构 → groups
+    for name, tmpl in (_cfg.config.get("schedule_templates", {}) or {}).items():
+        if "groups" not in tmpl and "days" in tmpl:
+            tmpl["groups"] = [{"days": tmpl.pop("days", [1,2,3,4,5]),
+                                "slots": tmpl.pop("slots", [])}]
+    _cfg.config["_schedule_migrated"] = True
+    from broadlinkac_core.config import save_config
+    save_config(_cfg.config)
+
+
 def register_all_jobs():
     """注册所有设备的 AC 定时任务（在 _sched_lock 内调用）"""
     sch.clear()
+    _migrate_schedule_config()
+    templates = _cfg.config.get("schedule_templates", {}) or {}
     for mac, dev in _cfg.config.get("devices", {}).items():
-        if dev.get("schedule_enabled", True):
-            sch.every().day.at(dev.get("trigger_time", "12:00")).do(scheduled_job, mac=mac)
-        if dev.get("off_enabled"):
-            sch.every().day.at(dev.get("off_time", "22:00")).do(scheduled_off_job, mac=mac)
+        tmpl_name = dev.get("active_template")
+        tmpl = templates.get(tmpl_name) if tmpl_name else None
+        if tmpl and dev.get("schedule_enabled", True):
+            groups = tmpl.get("groups", [])
+            # 向后兼容：无 groups 但有 days
+            if not groups and tmpl.get("days"):
+                groups = [{"days": tmpl["days"], "slots": tmpl.get("slots", [])}]
+            for grp in groups:
+                days = set(grp.get("days", []))
+                for slot in grp.get("slots", []):
+                    on_t = slot.get("on")
+                    off_t = slot.get("off")
+                    if on_t and slot.get("on_enabled", True):
+                        sch.every().day.at(on_t).do(_scheduled_on_wrapper, mac=mac, days=days)
+                    if off_t and slot.get("off_enabled", True):
+                        sch.every().day.at(off_t).do(_scheduled_off_wrapper, mac=mac, days=days)
+        else:
+            # 向后兼容：没有模板时用旧字段
+            if dev.get("schedule_enabled", True) and dev.get("trigger_time"):
+                sch.every().day.at(dev["trigger_time"]).do(scheduled_job, mac=mac)
+            if dev.get("off_enabled") and dev.get("off_time"):
+                sch.every().day.at(dev["off_time"]).do(scheduled_off_job, mac=mac)
         if dev.get("auto_adjust", True):
             sch.every(2).hours.do(auto_adjust_job, mac=mac)
 

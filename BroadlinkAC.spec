@@ -1,19 +1,43 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_submodules
 
+# 只打包需要的 Qt 模块，不包含 Qt3D/QtWebEngine 等重型模块
+pyside_hidden = [
+    'PySide6.QtCore', 'PySide6.QtGui', 'PySide6.QtWidgets',
+    'shiboken6',
+]
+
 a = Analysis(
-    ['ac_controller.py'],
+    ['ac_controller_pyside6.py'],
     pathex=[],
     binaries=[],
-    datas=[('protocols', 'protocols'), ('logos', 'logos'), ('使用文档.md', '.'), ('broadlink.png', '.'), ('broadlink.ico', '.')],
+    datas=[
+        ('protocols', 'protocols'),
+        ('logos', 'logos'),
+        ('fonts', 'fonts'),
+        ('icons', 'icons'),
+        ('使用文档.md', '.'),
+        ('broadlink.png', '.'),
+        ('broadlink.ico', '.'),
+        ('broadlinkac_desktop/pyside', 'broadlinkac_desktop/pyside'),
+    ],
     hiddenimports=[
         'protocols.haier', 'protocols.aux_ac', 'protocols.panasonic',
-        'pystray', 'PIL',
-    ] + collect_submodules('hvac_ir'),
+        'broadlinkac_desktop.pyside', 'broadlinkac_desktop.pyside.ac_tab',
+        'broadlinkac_desktop.pyside.ty_tab', 'broadlinkac_desktop.pyside.dialogs',
+        'broadlinkac_desktop.pyside._utils',
+    ] + pyside_hidden + collect_submodules('hvac_ir'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'PySide6.Qt3D*', 'PySide6.QtWebEngine*', 'PySide6.QtCharts*',
+        'PySide6.QtQuick*', 'PySide6.QtQml*', 'PySide6.QtMultimedia*',
+        'PySide6.QtBluetooth', 'PySide6.QtNfc', 'PySide6.QtSensors',
+        'PySide6.QtSerialPort', 'PySide6.QtSql', 'PySide6.QtTest',
+        'PySide6.QtHelp', 'PySide6.QtLocation', 'PySide6.QtPositioning',
+        'PySide6.QtTextToSpeech', 'PySide6.QtWebChannel',
+    ],
     noarchive=False,
     optimize=0,
 )

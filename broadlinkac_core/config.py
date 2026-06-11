@@ -56,7 +56,7 @@ def load_config():
     APP_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     if CONFIG_FILE.exists():
-        return json.loads(CONFIG_FILE.read_text())
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
     return {
         "current_device_mac": "",
         "devices": {},
@@ -83,7 +83,7 @@ def save_config(cfg, sync_device=True):
             for k in DEVICE_KEYS:
                 if k in cfg:
                     dev[k] = cfg[k]
-    CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False))
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def apply_config():
@@ -123,8 +123,7 @@ def switch_device(mac):
 
 
 DEVICE_KEYS = ("host", "port", "mac", "model", "name", "brand", "fan",
-               "schedule_enabled", "trigger_time", "off_enabled", "off_time",
-               "auto_adjust", "temp_rules")
+               "schedule_enabled", "auto_adjust", "temp_rules")
 
 
 def _save_flat_to_device(mac):
@@ -139,9 +138,8 @@ def _load_device_to_flat(mac):
     """将 devices[mac] 键展平到 config 根级"""
     dev = config.get("devices", {}).get(mac, {})
     DEFAULTS = {
-        "trigger_time": "12:00", "schedule_enabled": True,
-        "off_time": "22:00", "off_enabled": False,
-        "auto_adjust": True, "temp_rules": [[36,99,24,"cool"],[33,35,25,"cool"],[30,32,26,"cool"],[25,29,27,"cool"],[18,24,0,"off"],[0,17,28,"heat"]],
+        "schedule_enabled": True, "auto_adjust": True,
+        "temp_rules": [[36,99,24,"cool"],[33,35,25,"cool"],[30,32,26,"cool"],[25,29,27,"cool"],[18,24,0,"off"],[0,17,28,"heat"]],
     }
     for k in DEVICE_KEYS:
         config[k] = dev.get(k, DEFAULTS.get(k)) if k in DEFAULTS else dev.get(k, "")
@@ -200,9 +198,6 @@ def _migrate_old_config():
         "brand": config.pop("brand", "格力"),
         "fan": config.pop("fan", "auto"),
         "schedule_enabled": config.pop("schedule_enabled", True),
-        "trigger_time": config.pop("trigger_time", "12:00"),
-        "off_enabled": config.pop("off_enabled", False),
-        "off_time": config.pop("off_time", "22:00"),
         "auto_adjust": config.pop("auto_adjust", True),
         "temp_rules": config.pop("temp_rules", None) or [list(r) for r in DEFAULT_RULES],
     }
@@ -210,8 +205,8 @@ def _migrate_old_config():
     config["current_device_mac"] = mac
 
     # 清理残余键
-    for k in ("brand", "fan", "schedule_enabled", "trigger_time",
-              "off_enabled", "off_time", "auto_adjust", "temp_rules"):
+    for k in ("brand", "fan", "schedule_enabled",
+              "auto_adjust", "temp_rules"):
         config.pop(k, None)
 
     save_config(config)

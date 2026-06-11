@@ -5,7 +5,10 @@ import math
 import re
 import ssl
 import urllib.request
-from datetime import datetime
+import zipfile
+import io
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 
 NMC_HOST = "https://typhoon.nmc.cn/weatherservice"
 
@@ -147,16 +150,49 @@ def typhoon_threat_distance(provider=None):
 
 NHC_CAT = {"TD": "热带低压", "TS": "热带风暴", "HU": "飓风", "PTC": "后热带气旋"}
 DIRS = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"]
+NHC_KML_NS = "http://www.opengis.net/kml/2.2"
+
+
+def _parse_nhc_forecast_kmz(kmz_url):
+    """下载 NHC KMZ 预报包 → 提取 KML → 返回 forecasts 列表"""
+    try:
+        resp = _urlopen(kmz_url, timeout=15)
+        zf = zipfile.ZipFile(io.BytesIO(resp.read()))
+        # KMZ 里通常只有一个 .kml 文件
+        kml_name = [n for n in zf.namelist() if n.endswith(".kml")]
+        if not kml_name:
+            print(f"[NHC] KMZ 中未找到 KML")
+            return []
+        kml_data = zf.read(kml_name[0]).decode("utf-8")
+        root = ET.fromstring(kml_data)
+
+        # 收集所有 Placemark 的时间+坐标（按时间排序）
+        points = []
+        now = datetime.now(timezone.utc)
+        for pm in root.findall(f".//{{{NHC_KML_NS}}}Placemark"):
+            when_el = pm.find(f".//{{{NHC_KML_NS}}}when")
+            coord_el = pm.find(f".//{{{NHC_KML_NS}}}Point//{{{NHC_KML_NS}}}coordinates")
+            if when_el is None or coord_el is None:
+                continue
+            try:
+                ts = datetime.fromisoformat(when_el.text.replace("Z", "+00:00"))
+                lon, lat, *_ = coord_el.text.strip().split(",")
+                hours = round((ts - now).total_seconds() / 3600)
+                if hours >= 0:
+                    points.append({"lat": float(lat), "lon": float(lon), "hours": hours})
+            except (ValueError, TypeError):
+                continue
+        points.sort(key=lambda p: p["hours"])
+        return points[:8]  # 最多取前 8 个预报点
+    except Exception as e:
+        print(f"[NHC] KMZ 解析失败: {e}")
+        return []
 
 
 def fetch_nhc_storms():
     """拉取 NHC 活跃飓风，归一化为与 NMC 相同的 _typhoons_data 格式"""
     try:
-        req = urllib.request.Request(
-            "https://www.nhc.noaa.gov/CurrentStorms.json",
-            headers={"User-Agent": "BroadlinkAC/3.0"}
-        )
-        resp = urllib.request.urlopen(req, timeout=10)
+        resp = _urlopen("https://www.nhc.noaa.gov/CurrentStorms.json", timeout=10)
         data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         print(f"[NHC] 请求失败: {e}")
@@ -172,6 +208,12 @@ def fetch_nhc_storms():
             move_dir = DIRS[round(int(s["movementDir"]) / 45) % 8]
             update = s["lastUpdate"].replace("T", " ").replace("Z", "").split(".")[0]
 
+            # 尝试解析 KMZ 预报路径
+            forecasts = []
+            ft = s.get("forecastTrack")
+            if ft and ft.get("kmzFile"):
+                forecasts = _parse_nhc_forecast_kmz(ft["kmzFile"])
+
             results.append({
                 "id": s["id"], "eng": s["name"], "cn": s["name"],
                 "code": s["binNumber"], "meaning": "",
@@ -183,7 +225,7 @@ def fetch_nhc_storms():
                     "direction": f"{move_dir} ({s['movementDir']}°)",
                     "speed": move_spd,
                     "update_time": update,
-                    "forecasts": [],  # NHC 预报在 KMZ 文件里，不解析
+                    "forecasts": forecasts,
                 }
             })
         except Exception as e:

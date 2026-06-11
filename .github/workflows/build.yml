@@ -21,11 +21,8 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
       - run: |
-          sudo apt-get update && sudo apt-get install -y python3-tk
           pip install -r requirements.txt pyinstaller
-          pyinstaller --noconsole --onedir --name BroadlinkAC \
-            --hidden-import protocols.haier --hidden-import protocols.aux_ac --hidden-import protocols.panasonic \
-            --add-data "protocols:protocols" --add-data "logos:logos" ac_controller.py
+          pyinstaller --clean --noconfirm BroadlinkAC-linux.spec
           cd dist && tar czf ../BroadlinkAC-linux.tar.gz BroadlinkAC
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-linux, path: BroadlinkAC-linux.tar.gz }
@@ -39,8 +36,7 @@ jobs:
         with: { python-version: '3.11' }
       - run: |
           pip install -r requirements.txt pyinstaller
-          pyinstaller BroadlinkAC.spec
-          # spec 生成 onefile → dist/BroadlinkAC.exe
+          pyinstaller --clean --noconfirm BroadlinkAC.spec
           Compress-Archive -Path dist/BroadlinkAC.exe -DestinationPath BroadlinkAC-Windows.zip
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-Windows, path: BroadlinkAC-Windows.zip }
@@ -51,11 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: '3.12' }
+        with: { python-version: '3.11' }
       - run: |
           pip install -r requirements.txt pyinstaller
-          pip install pyobjc-framework-cocoa
-          pyinstaller BroadlinkAC-macOS.spec
+          pyinstaller --clean --noconfirm BroadlinkAC-macOS.spec
           cd dist && zip -r ../BroadlinkAC-macOS.zip BroadlinkAC.app
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-macOS, path: BroadlinkAC-macOS.zip }
