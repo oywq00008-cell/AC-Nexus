@@ -13,7 +13,7 @@ a = Analysis(
     datas=[
         ('protocols', 'protocols'),
         ('logos', 'logos'),
-        ('fonts', 'fonts'),
+        ('fonts/HarmonyOS_Sans_SC_Regular.ttf', 'fonts'),
         ('icons', 'icons'),
         ('使用文档.md', '.'),
         ('broadlink.png', '.'),
@@ -45,13 +45,11 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
-    [],
+    exclude_binaries=True,
     name='BroadlinkAC',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
+    strip=True,
     upx=True,
     console=False,
     disable_windowed_traceback=False,
@@ -62,8 +60,18 @@ exe = EXE(
     icon='broadlink.icns',
 )
 
-app = BUNDLE(
+coll = COLLECT(
     exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='BroadlinkAC',
+)
+
+app = BUNDLE(
+    coll,
     name='BroadlinkAC.app',
     icon='broadlink.icns',
     bundle_identifier='com.broadlinkac.app',
