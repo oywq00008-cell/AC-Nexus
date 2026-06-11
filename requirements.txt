@@ -1,9 +1,7 @@
 broadlink>=0.19.0
-customtkinter>=5.2.0
+PySide6>=6.5.0
 schedule>=1.2.0
-tkcalendar>=1.6.1
 hvac_ir>=0.7.0
 netifaces>=0.11.0
-pystray>=0.19.0
 Pillow>=9.0.0
 pywin32>=300; sys_platform == 'win32'
