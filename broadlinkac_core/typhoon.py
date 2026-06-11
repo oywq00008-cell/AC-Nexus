@@ -1,4 +1,4 @@
-"""BroadlinkAC Core — 台风监测"""
+"""BroadlinkAC Core — 风暴监测"""
 
 import json
 import math

@@ -122,7 +122,7 @@ def _typhoon_card(app):
     ic = QtWidgets.QLabel()
     ic.setPixmap(QtGui.QIcon(f"{base}/typhoon.svg").pixmap(20, 20))
     tl.addWidget(ic)
-    tl.addWidget(lbl("台风监测", bold=True, size=14))
+    tl.addWidget(lbl("风暴监测", bold=True, size=14))
     app._ty_provider_cb = QtWidgets.QComboBox()
     app._ty_provider_cb.addItems(["西北太平洋台风", "北大西洋飓风"])
     app._ty_provider_cb.currentTextChanged.connect(app._on_ty_provider_change)

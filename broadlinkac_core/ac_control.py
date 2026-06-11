@@ -7,6 +7,7 @@ import broadlink
 from broadlink.remote import pulses_to_data
 
 import broadlinkac_core.config as _cfg
+from broadlinkac_core.logger import write_log
 
 
 # UI 显示用
@@ -15,49 +16,41 @@ FANS = {"自动": "auto", "1 档": "1", "2 档": "2", "3 档": "3"}
 MODE_KEYS = {v: k for k, v in MODES.items()}
 
 
-def _get_local_ips():
-    """获取本机所有非回环 IPv4 地址（排除 127.x, docker, 虚拟网卡等）"""
-    ips = []
+def _get_primary_ip():
+    """获取本机主网卡 IP（能路由到外网的那张）"""
     try:
-        import netifaces
-        for iface in netifaces.interfaces():
-            addrs = netifaces.ifaddresses(iface).get(netifaces.AF_INET, [])
-            for addr in addrs:
-                ip = addr.get('addr', '')
-                if ip and not ip.startswith('127.') and ip != '0.0.0.0':
-                    ips.append(ip)
-    except ImportError:
-        pass
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 1))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return '0.0.0.0'
 
-    if not ips:
-        # fallback: 用 socket 连接外部地址来推断本机 IP
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(('8.8.8.8', 1))
-            ip = s.getsockname()[0]
-            s.close()
-            if ip and not ip.startswith('127.'):
-                ips.append(ip)
-        except Exception:
-            ips.append('0.0.0.0')
-    return ips
+
+def _subnet_broadcast(ip):
+    """根据 IP 和常见子网掩码计算广播地址。假设 /24 网段。"""
+    parts = ip.split('.')
+    if len(parts) == 4 and not ip.startswith('127.'):
+        return '.'.join(parts[:3] + ['255'])
+    return '255.255.255.255'
 
 
 def discover_devices(timeout=5):
-    """遍历所有本机网卡，逐个尝试 UDP 广播发现博联设备。返回设备列表。"""
-    local_ips = _get_local_ips()
+    """在主网卡上用子网广播发现博联设备。macOS 上只扫主网卡，避免虚拟网卡超时。"""
+    ip = _get_primary_ip()
+    broadcast = _subnet_broadcast(ip)
     all_devices = []
-    for ip in local_ips:
-        try:
-            devices = broadlink.discover(
-                timeout=timeout,
-                local_ip_address=ip,
-                discover_ip_address='255.255.255.255',
-                discover_ip_port=80,
-            )
-            all_devices.extend(devices)
-        except Exception:
-            pass
+    try:
+        devices = broadlink.discover(
+            timeout=timeout,
+            local_ip_address=ip,
+            discover_ip_address=broadcast,
+            discover_ip_port=80,
+        )
+        all_devices.extend(devices)
+    except Exception as e:
+        write_log("系统", f"设备扫描失败 ({ip}): {e}")
     return all_devices
 
 
@@ -80,8 +73,9 @@ def get_device(mac=None):
     # 回退扫描
     all_devices = discover_devices(timeout=5)
     if not all_devices:
-        raise Exception("未发现博联设备，请确认：\n1. 电脑和博联设备在同一个局域网\n"
-                        "2. Windows 防火墙允许 UDP 端口 80 的入站/出站通信")
+        raise Exception("未发现博联设备，请确认：\n"
+                        "1. 电脑和博联设备在同一个局域网\n"
+                        "2. 防火墙允许 UDP 端口 80 的通信")
     d = all_devices[0]
     d.auth()
     # 更新到 config

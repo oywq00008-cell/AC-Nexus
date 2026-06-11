@@ -61,12 +61,22 @@ Agent 传参 `brand="日立"` 或 `brand="hitachi"` 均可自动解析。
 - ⏰ **定时模板** — 多日期组独立设置（工作日/周末不同时段）
 - 🌡️ **智能温控** — 室外温度变化自动调整制冷/制热目标
 - 🌤️ **双源天气** — 百度 / 和风，一键切换
-- 🌀 **双源台风** — 西北太平洋 (NMC) + 北大西洋飓风 (NHC)，路径预报图
+- 🌀 **双源风暴** — 中国中央气象台 (NMC) + 美国飓风中心 (NHC)，路径预报图
 - 🌪️ **风暴保护** — 距离 < 100km 自动关闭所有空调
-- ⚠️ **预警信息** — 台风监测 + 当地天气预警，左右分栏
+- ⚠️ **预警信息** — 风暴监测 + 当地天气预警，左右分栏
 - 🎨 **深色主题** — 浅色/深色一键切换
 - 📋 **操作日志** — 按日期检索
 - 🔧 **故障诊断** — 自动检测环境和设备
+
+## 📸 界面截图
+
+| 主界面 | 预警信息 |
+|--------|----------|
+- ![主界面](assets/screenshot-main.png) | ![预警信息](assets/screenshot-typhoon.png) |
+
+| 设置 |
+|------|
+- ![设置](assets/screenshot-settings.png) |
 
 ## 🧰 硬件要求
 
@@ -89,10 +99,7 @@ Agent 传参 `brand="日立"` 或 `brand="hitachi"` 均可自动解析。
 | 🍎 macOS | [BroadlinkAC.app](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-macOS.zip) |
 | 🐧 Linux | [BroadlinkAC-linux](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-linux.tar.gz) |
 
-macOS 首次运行：
-```bash
-xattr -cr /Applications/BroadlinkAC.app
-```
+macOS 首次运行如果提示"无法验证开发者"，解压后先看 `打不开请看我.txt`。
 
 源码运行：
 ```bash
@@ -126,7 +133,7 @@ broadlinkac_core/             # 核心库（零 GUI 依赖）
 ├── __init__.py               # 公共 API
 ├── config.py                 # 配置 + resolve_brand() + 设备管理
 ├── weather.py                # 双源天气 + 预警
-├── typhoon.py                # 台风 (NMC) + 飓风 (NHC) + KMZ 预报
+├── typhoon.py                # 风暴 (NMC) + 飓风 (NHC) + KMZ 预报
 ├── ac_control.py             # 空调控制 + 动态协议导入
 ├── scheduler.py              # 定时调度（多日期组模板）
 └── logger.py                 # 日志
@@ -162,5 +169,5 @@ MIT License
 - [hvac_ir](https://github.com/nicko858/hvac_ir) — 红外协议库
 - [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ 协议参考
 - [和风天气](https://www.qweather.com) / [百度地图开放平台](https://lbsyun.baidu.com) — 天气数据
-- [中央气象台](https://www.nmc.cn) — 台风数据
+- [中国中央气象台](https://www.nmc.cn) — 风暴数据
 - [NHC](https://www.nhc.noaa.gov) — 北大西洋飓风数据

@@ -61,7 +61,7 @@ Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — 
 - 🌤️ **Dual weather** — Baidu / QWeather API, one-click switch
 - 🌀 **Dual storm source** — NW Pacific (NMC) + N. Atlantic hurricanes (NHC), path forecast
 - 🌪️ **Storm protection** — Auto-shutdown all ACs when storm < 100km
-- ⚠️ **Alerts** — Typhoon tracking + local weather warnings, split layout
+- ⚠️ **Alerts** — Storm tracking + local weather warnings, split layout
 - 🎨 **Dark theme** — Light/dark mode toggle
 - 📋 **Activity log** — Browse by date
 - 🔧 **Diagnostics** — One-click health check
@@ -87,10 +87,7 @@ Both projects share the core algorithm and IR protocols, evolving independently.
 | 🍎 macOS | [BroadlinkAC.app](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-macOS.zip) |
 | 🐧 Linux | [BroadlinkAC-linux](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-linux.tar.gz) |
 
-macOS first run:
-```bash
-xattr -cr /Applications/BroadlinkAC.app
-```
+macOS first run: if you see "unable to verify developer", unzip and open `打不开请看我.txt` first.
 
 From source:
 ```bash
@@ -124,7 +121,7 @@ broadlinkac_core/             # Core library (zero GUI deps)
 ├── __init__.py               # Public API
 ├── config.py                 # Config + resolve_brand() + device mgmt
 ├── weather.py                # Dual-source weather + alerts
-├── typhoon.py                # Typhoon (NMC) + Hurricane (NHC) + KMZ forecast
+├── typhoon.py                # Storm (NMC) + Hurricane (NHC) + KMZ forecast
 ├── ac_control.py             # AC control + dynamic protocol import
 ├── scheduler.py              # Scheduling (multi-group templates)
 └── logger.py                 # Logging
@@ -132,7 +129,7 @@ broadlinkac_desktop/          # PySide6 desktop GUI
 ├── app_pyside6.py            # Main window
 └── pyside/                   # UI modules
     ├── ac_tab.py             # AC + Weather + Timer + Rules
-    ├── ty_tab.py             # Typhoon + Alerts + Forecast chart
+    ├── ty_tab.py             # Storm + Alerts + Forecast chart
     ├── dialogs.py            # All dialogs
     └── _utils.py             # Utilities
 protocols/                    # Custom IR protocols
@@ -160,5 +157,5 @@ MIT License
 - [hvac_ir](https://github.com/nicko858/hvac_ir) — IR protocol library
 - [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ protocol reference
 - [QWeather](https://www.qweather.com) / [Baidu Maps](https://lbsyun.baidu.com) — Weather data
-- [China NMC](https://www.nmc.cn) — Typhoon data
+- [China NMC](https://www.nmc.cn) — Storm data
 - [NHC](https://www.nhc.noaa.gov) — Atlantic hurricane data

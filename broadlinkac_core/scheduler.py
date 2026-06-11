@@ -11,7 +11,7 @@ from broadlinkac_core.weather import fetch_weather
 from broadlinkac_core.ac_control import send_ac, decide_ac, MODE_KEYS
 from broadlinkac_core.logger import write_log, get_last_ac_state
 
-_sched_lock = threading.Lock()
+_sched_lock = threading.RLock()  # 可重入锁，register_all_jobs 内部自锁
 
 
 def _device_online(mac):
@@ -164,35 +164,36 @@ def _migrate_schedule_config():
 
 
 def register_all_jobs():
-    """注册所有设备的 AC 定时任务（在 _sched_lock 内调用）"""
-    sch.clear()
-    _migrate_schedule_config()
-    templates = _cfg.config.get("schedule_templates", {}) or {}
-    for mac, dev in _cfg.config.get("devices", {}).items():
-        tmpl_name = dev.get("active_template")
-        tmpl = templates.get(tmpl_name) if tmpl_name else None
-        if tmpl and dev.get("schedule_enabled", True):
-            groups = tmpl.get("groups", [])
-            # 向后兼容：无 groups 但有 days
-            if not groups and tmpl.get("days"):
-                groups = [{"days": tmpl["days"], "slots": tmpl.get("slots", [])}]
-            for grp in groups:
-                days = set(grp.get("days", []))
-                for slot in grp.get("slots", []):
-                    on_t = slot.get("on")
-                    off_t = slot.get("off")
-                    if on_t and slot.get("on_enabled", True):
-                        sch.every().day.at(on_t).do(_scheduled_on_wrapper, mac=mac, days=days)
-                    if off_t and slot.get("off_enabled", True):
-                        sch.every().day.at(off_t).do(_scheduled_off_wrapper, mac=mac, days=days)
-        else:
-            # 向后兼容：没有模板时用旧字段
-            if dev.get("schedule_enabled", True) and dev.get("trigger_time"):
-                sch.every().day.at(dev["trigger_time"]).do(scheduled_job, mac=mac)
-            if dev.get("off_enabled") and dev.get("off_time"):
-                sch.every().day.at(dev["off_time"]).do(scheduled_off_job, mac=mac)
-        if dev.get("auto_adjust", True):
-            sch.every(2).hours.do(auto_adjust_job, mac=mac)
+    """注册所有设备的 AC 定时任务，内部持有 _sched_lock"""
+    with _sched_lock:
+        sch.clear()
+        _migrate_schedule_config()
+        templates = _cfg.config.get("schedule_templates", {}) or {}
+        for mac, dev in _cfg.config.get("devices", {}).items():
+            tmpl_name = dev.get("active_template")
+            tmpl = templates.get(tmpl_name) if tmpl_name else None
+            if tmpl and dev.get("schedule_enabled", True):
+                groups = tmpl.get("groups", [])
+                # 向后兼容：无 groups 但有 days
+                if not groups and tmpl.get("days"):
+                    groups = [{"days": tmpl["days"], "slots": tmpl.get("slots", [])}]
+                for grp in groups:
+                    days = set(grp.get("days", []))
+                    for slot in grp.get("slots", []):
+                        on_t = slot.get("on")
+                        off_t = slot.get("off")
+                        if on_t and slot.get("on_enabled", True):
+                            sch.every().day.at(on_t).do(_scheduled_on_wrapper, mac=mac, days=days)
+                        if off_t and slot.get("off_enabled", True):
+                            sch.every().day.at(off_t).do(_scheduled_off_wrapper, mac=mac, days=days)
+            else:
+                # 向后兼容：没有模板时用旧字段
+                if dev.get("schedule_enabled", True) and dev.get("trigger_time"):
+                    sch.every().day.at(dev["trigger_time"]).do(scheduled_job, mac=mac)
+                if dev.get("off_enabled") and dev.get("off_time"):
+                    sch.every().day.at(dev["off_time"]).do(scheduled_off_job, mac=mac)
+            if dev.get("auto_adjust", True):
+                sch.every(2).hours.do(auto_adjust_job, mac=mac)
 
 
 def scheduler_loop():

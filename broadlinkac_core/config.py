@@ -83,7 +83,9 @@ def save_config(cfg, sync_device=True):
             for k in DEVICE_KEYS:
                 if k in cfg:
                     dev[k] = cfg[k]
-    CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp = CONFIG_FILE.with_suffix('.tmp')
+    tmp.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(CONFIG_FILE)
 
 
 def apply_config():

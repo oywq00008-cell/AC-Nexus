@@ -7,7 +7,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import broadlinkac_core.config as _cfg
 from broadlinkac_core.config import save_config, apply_config, AC_BRANDS, LOG_DIR
 from broadlinkac_core.ac_control import MODES, MODE_KEYS
-from broadlinkac_core.logger import get_log_dates
+from broadlinkac_core.logger import get_log_dates, write_log
 from broadlinkac_core.weather import city_lookup
 from ._utils import frm, lbl
 
@@ -476,6 +476,7 @@ def open_settings(app):
         app._update_alert_source()
         # 重新获取天气（无论是否切换位置/源）
         app._fetch_weather_all()
+        write_log("系统", "设置已更新")
         dlg.accept()
 
     btns = QtWidgets.QWidget(); bl = QtWidgets.QHBoxLayout(btns)
@@ -583,31 +584,39 @@ def open_repair(app):
         def _ping_ok(host):
             param = "-n" if platform.system() == "Windows" else "-c"
             try:
-                r = subprocess.run(["ping", param, "1", host], capture_output=True, text=True, timeout=5)
+                r = subprocess.run(["ping", param, "2", host], capture_output=True, text=True, timeout=5)
                 return r.returncode == 0
             except Exception: return False
 
+        def _http_ok():
+            """HTTP 联网检测（ICMP 可能被防火墙屏蔽）"""
+            try:
+                urllib.request.urlopen("https://www.baidu.com", timeout=5)
+                return True
+            except Exception:
+                return False
+
         push(lines, "┌─ 网络诊断 ─────────────", "#888")
-        try:
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-            if local_ip.startswith("127."):
-                push(lines, "│ ❌ 电脑未接入互联网", "#E74C3C")
-                push(lines, "│    → 请检查网线/WiFi", "#E67E22")
+        if _http_ok():
+            # 通过真实路由获取本机 IP（gethostbyname 在 macOS 常返回 127.0.0.1）
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                local_ip = s.getsockname()[0]
+                s.close()
+            except Exception:
+                local_ip = "未知"
+            push(lines, f"│ 📶 本机 IP: {local_ip}", "#AAA")
+            gateway = ".".join(local_ip.split(".")[:3] + ["1"]) if local_ip != "未知" else None
+            if gateway and not _ping_ok(gateway):
+                push(lines, f"│ ❌ 网关 {gateway} 不通", "#E74C3C")
+                push(lines, "│    → 路由器连接有问题", "#E67E22")
             else:
-                gateway = ".".join(local_ip.split(".")[:3] + ["1"])
-                push(lines, f"│ 📶 本机 IP: {local_ip}", "#AAA")
-                if not _ping_ok(gateway):
-                    push(lines, f"│ ❌ 网关 {gateway} 不通", "#E74C3C")
-                    push(lines, "│    → 路由器连接有问题", "#E67E22")
-                else:
-                    push(lines, f"│ ✅ 路由器 {gateway} 可达", "#27AE60")
-                    if _ping_ok("baidu.com"):
-                        push(lines, "│ ✅ 外网 baidu.com 可达", "#27AE60")
-                    else:
-                        push(lines, "│ ❌ 外网不通（路由通但不出网）", "#E74C3C")
-        except Exception as ne:
-            push(lines, f"│ ❌ {ne}", "#E74C3C")
+                push(lines, f"│ ✅ 路由器 {gateway} 可达", "#27AE60")
+                push(lines, "│ ✅ 外网可达", "#27AE60")
+        else:
+            push(lines, "│ ❌ 无法连接外网", "#E74C3C")
+            push(lines, "│    → 请检查网线/WiFi", "#E67E22")
         push(lines, "└────────────────────────", "#888")
         push(lines, "")
 
@@ -635,6 +644,37 @@ def open_repair(app):
         except Exception as we:
             push(lines, f"│ ❌ API 请求失败: {we}", "#E74C3C")
         push(lines, "└────────────────────────", "#888")
+
+        # ── 百度天气 API ──
+        push(lines, "┌─ 百度天气 API ─────────", "#888")
+        bd_key = _cfg.config.get("baidu_key", "")
+        if not bd_key:
+            push(lines, "│ ❌ API Key 未填写", "#E74C3C")
+        else:
+            push(lines, f"│ ✅ API Key: {bd_key[:4]}...{bd_key[-4:]}", "#27AE60")
+            try:
+                lon, lat = _cfg.LOCATION["lon"], _cfg.LOCATION["lat"]
+                url = f"https://api.map.baidu.com/weather/v1/?location={lon},{lat}&coordtype=wgs84&data_type=now&ak={bd_key}"
+                req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC/2.0"})
+                resp = urllib.request.urlopen(req, timeout=6)
+                data = json.loads(resp.read())
+                if data.get("status") == 0:
+                    push(lines, "│ ✅ API 请求成功", "#27AE60")
+                else:
+                    push(lines, f"│ ⚠ {data.get('message', data)}", "#E67E22")
+            except Exception as we:
+                push(lines, f"│ ❌ API 请求失败: {we}", "#E74C3C")
+        push(lines, "└────────────────────────", "#888")
+        push(lines, "")
+
+        # 如果有失败项，提示查看使用文档
+        has_failure = any("❌" in text for text, color in lines)
+        if has_failure:
+            push(lines, "─" * 26, "#888")
+            push(lines, "💡 遇到 ❌ 怎么办？", "#2F80ED")
+            push(lines, "   打开菜单栏 帮助 → 使用文档", "#AAA")
+            push(lines, "   里面有每一项问题的详细解决方法", "#AAA")
+            push(lines, "─" * 26, "#888")
 
         # 一次性投递到主线程渲染
         app._ui(lambda: _render(lines))
@@ -839,6 +879,7 @@ def open_schedule_template(app):
             _refresh_tmpl_list()
             tmpl_cb.setCurrentText(name.strip())
             _rebuild_all()
+            write_log("定时", f"新增模板: {name.strip()}")
     btn = QtWidgets.QPushButton("＋"); btn.setFixedSize(30, 26)
     btn.setToolTip("新增模板")
     btn.clicked.connect(_add_tmpl); trl.addWidget(btn)
@@ -853,6 +894,7 @@ def open_schedule_template(app):
                 if d.get("active_template") == old:
                     d["active_template"] = name.strip()
             _refresh_tmpl_list(); tmpl_cb.setCurrentText(name.strip())
+            write_log("定时", f"模板重命名: {old} → {name.strip()}")
     btn = QtWidgets.QPushButton("✎"); btn.setFixedSize(30, 26)
     btn.setToolTip("重命名模板")
     btn.clicked.connect(_rename_tmpl); trl.addWidget(btn)
@@ -873,6 +915,7 @@ def open_schedule_template(app):
                     d.pop("active_template", None)
                     d["schedule_enabled"] = False
         _refresh_tmpl_list(); _rebuild_all()
+        write_log("定时", f"已删除模板: {name}")
     btn = QtWidgets.QPushButton("🗑"); btn.setFixedSize(30, 26)
     btn.setToolTip("删除模板")
     btn.clicked.connect(_del_tmpl); trl.addWidget(btn)
@@ -961,7 +1004,7 @@ def open_schedule_template(app):
                 del_s_btn = QtWidgets.QPushButton("×")
                 del_s_btn.setFixedSize(22, 22)
                 del_s_btn.setStyleSheet("QPushButton { border:1px solid #CCC; border-radius:3px; color:#999; } QPushButton:hover { background:#EEE; }")
-                del_s_btn.clicked.connect(_del_grp_slot)
+                del_s_btn.clicked.connect(lambda checked=False: _del_grp_slot())
                 rl.addWidget(del_s_btn)
                 slot_layout.addWidget(row)
         _rebuild_group_slots()
@@ -978,8 +1021,10 @@ def open_schedule_template(app):
 
         # 删除组
         def _del_group(w=frame):
-            w.deleteLater()
-        del_btn.clicked.connect(_del_group)
+            w.hide()
+            groups_layout.removeWidget(w)
+            w.setParent(None)
+        del_btn.clicked.connect(lambda checked=False, w=frame: _del_group(w))
 
         groups_layout.addWidget(frame)
 
@@ -1052,11 +1097,13 @@ def open_schedule_template(app):
         tmpl.pop("days", None); tmpl.pop("slots", None)  # 清理旧字段
         dev["active_template"] = name
         dev["schedule_enabled"] = True
+        _cfg.config["schedule_enabled"] = True
         save_config(_cfg.config)
         from broadlinkac_core.scheduler import register_all_jobs
         with __import__("broadlinkac_core.scheduler", fromlist=["_sched_lock"])._sched_lock:
             register_all_jobs()
         app._ui(lambda: app._update_schedule_display())
+        write_log("定时", f"已保存模板: {name}")
         dlg.accept()
     bl.addWidget(QtWidgets.QPushButton("保存", clicked=_save))
     bl.addStretch()
@@ -1097,6 +1144,7 @@ def edit_rules(app):
             except: pass
         if rules:
             _cfg.config["temp_rules"] = rules; save_config(_cfg.config); app._refresh_rules_display()
+            write_log("系统", "已更新温度规则")
         dlg.accept()
     b.clicked.connect(save); bl.addWidget(b)
     layout.addWidget(btns); dlg.exec()
@@ -1121,6 +1169,7 @@ def edit_ty_alert(app):
         except: _cfg.config["typhoon_alert_km"] = 800
         _cfg.config["typhoon_alert_enabled"] = alert_sw.isChecked()
         save_config(_cfg.config); app._update_ty_status(); dlg.accept()
+        write_log("台风", f"预警设置已更新: 距离={_cfg.config['typhoon_alert_km']}km, 提醒={'开' if _cfg.config['typhoon_alert_enabled'] else '关'}")
     b = QtWidgets.QPushButton("保存"); b.clicked.connect(save); bl.addWidget(b)
     b = QtWidgets.QPushButton("取消"); b.clicked.connect(dlg.reject); bl.addWidget(b)
     layout.addWidget(btns); dlg.exec()

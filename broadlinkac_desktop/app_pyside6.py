@@ -142,8 +142,9 @@ class App(QtWidgets.QMainWindow):
         }
         QComboBox QAbstractItemView {
             border: 1px solid #DEDEDE;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 4px;
+            background: white;
             selection-background-color: #E8F0FE;
             selection-color: #2F80ED;
             outline: none;
@@ -329,8 +330,6 @@ class App(QtWidgets.QMainWindow):
         """)
         scan_btn.clicked.connect(self._scan_devices)
         layout.addWidget(scan_btn, alignment=QtCore.Qt.AlignTop)
-        self._dev_spinner = QtWidgets.QLabel("")
-        layout.addWidget(self._dev_spinner)
 
         layout.addStretch()
 
@@ -341,17 +340,18 @@ class App(QtWidgets.QMainWindow):
         """)
         layout.addWidget(self._conn_status)
 
-        layout.addSpacing(30)
+        layout.addSpacing(20)
 
         # 最后更新时间
-        self._update_time_lbl = QtWidgets.QLabel("最后更新：--:--")
+        from datetime import datetime
+        self._update_time_lbl = QtWidgets.QLabel(f"最后更新：{datetime.now().strftime('%H:%M')}")
         self._update_time_lbl.setStyleSheet("color: #AAA;")
         layout.addWidget(self._update_time_lbl)
 
         # 刷新按钮
         refresh_btn = QtWidgets.QPushButton()
         refresh_btn.setIcon(QtGui.QIcon(self._icon("refresh.svg")))
-        refresh_btn.setToolTip("刷新数据")
+        refresh_btn.setToolTip("全局刷新")
         refresh_btn.setFixedSize(30, 30)
         refresh_btn.clicked.connect(self._refresh_all_data)
         layout.addWidget(refresh_btn)
@@ -510,6 +510,8 @@ class App(QtWidgets.QMainWindow):
         mac = self._dev_combo.itemData(idx)
         if mac and hasattr(self, '_ctrl_title'):
             switch_device(mac); save_config(_cfg.config); self._refresh_device_ui()
+            dev = get_current_device()
+            write_log("系统", f"切换设备 → {dev.get('name', mac[:8])}")
 
     def _refresh_device_ui(self):
         dev = get_current_device()
@@ -519,27 +521,29 @@ class App(QtWidgets.QMainWindow):
         self._update_schedule_display()
 
     def _scan_devices(self):
-        self._dev_spinner.setText("⏳ 扫描中...")
+        self._conn_status.setText("● 扫描中")
+        self._conn_status.setStyleSheet(
+            "QLabel { color:#E67E22; font-weight:medium; border:1px solid #E67E22; border-radius:8px; padding:0px 8px; font-size:13px; max-height:17px; }")
         threading.Thread(target=self._do_scan_devices, daemon=True).start()
 
     def _do_scan_devices(self):
         try:
             devices = discover_devices(timeout=5)
         except Exception as e:
-            self._ui(lambda: self._dev_spinner.setText(f"❌ {e}"))
-            self._ui(lambda: self._conn_status.setText("● 扫描失败"))
+            write_log("系统", f"设备扫描异常: {e}")
+            self._ui(lambda: self._conn_status.setText("● 未连接"))
             self._ui(lambda: self._conn_status.setStyleSheet(
                 "QLabel { color:#E74C3C; font-weight:bold; border:1px solid #E74C3C; border-radius:7px; padding:0px 8px; font-size:12px; max-height:16px; }"))
-            self._ui(lambda: QtCore.QTimer.singleShot(4000, lambda: self._dev_spinner.setText("")))
+            self._ui(lambda: self.statusBar().showMessage(f"❌ 扫描异常: {e}", 4000))
             return
         if not devices:
+            write_log("系统", "设备扫描: 未发现设备")
             _cfg._online_macs = set()
-            self._ui(lambda: self._dev_spinner.setText("❌ 未发现设备"))
             self._ui(lambda: self._conn_status.setText("● 未连接"))
             self._ui(lambda: self._conn_status.setStyleSheet(
                 "QLabel { color:#E74C3C; font-weight:bold; border:1px solid #E74C3C; border-radius:7px; padding:0px 8px; font-size:12px; max-height:16px; }"))
             self._ui(self._refresh_device_list)
-            self._ui(lambda: QtCore.QTimer.singleShot(4000, lambda: self._dev_spinner.setText("")))
+            self._ui(lambda: self.statusBar().showMessage("❌ 未发现设备", 4000))
             return
         online = set()
         for d in devices:
@@ -553,14 +557,14 @@ class App(QtWidgets.QMainWindow):
         save_config(_cfg.config)
         _cfg._online_macs = online
         count = len(devices)
+        write_log("系统", f"设备扫描完成: 发现 {count} 个设备")
         self._ui(self._refresh_device_list)
         self._ui(self._refresh_device_ui)
         self._ui(register_all_jobs)
-        self._ui(lambda: self._dev_spinner.setText(f"✅ {count} 个设备"))
         self._ui(lambda: self._conn_status.setText("● 已连接"))
         self._ui(lambda: self._conn_status.setStyleSheet(
             "QLabel { color:#27AE60; font-weight:medium; border:1px solid #27AE60; border-radius:8px; padding:0px 8px; font-size:13px; max-height:17px; }"))
-        self._ui(lambda: QtCore.QTimer.singleShot(4000, lambda: self._dev_spinner.setText("")))
+        self._ui(lambda: self.statusBar().showMessage(f"✅ 发现 {count} 个设备", 4000))
 
     def _rename_device(self):
         mac = _cfg.config.get("current_device_mac","")
@@ -571,18 +575,21 @@ class App(QtWidgets.QMainWindow):
         if new_name and new_name != old:
             _cfg.config.setdefault("devices",{}).setdefault(mac,{})["name"] = new_name
             _cfg.config["name"] = new_name; save_config(_cfg.config); self._refresh_device_list()
+            write_log("系统", f"设备重命名: {old} → {new_name}")
 
     def _delete_device(self):
         mac=_cfg.config.get("current_device_mac","")
         devs=_cfg.config.get("devices",{})
+        name = devs.get(mac,{}).get('name', mac[:8])
         if not mac or len(devs)<=1:
             from .pyside.dialogs import open_delete_device
             open_delete_device(self, allow=False); return
         from .pyside.dialogs import open_delete_device
-        if open_delete_device(self, name=devs.get(mac,{}).get('name', mac[:8])):
+        if open_delete_device(self, name=name):
             del devs[mac]; _cfg.config["current_device_mac"]=next(iter(devs))
             switch_device(_cfg.config["current_device_mac"]); save_config(_cfg.config)
             self._refresh_device_list(); self._refresh_device_ui(); register_all_jobs()
+            write_log("系统", f"已删除设备: {name}")
 
     # ===== 台风/预警 UI 更新 =====
     def _update_alert_source(self):
@@ -594,7 +601,7 @@ class App(QtWidgets.QMainWindow):
             self._ty_source_label.setText("数据: 美国国家飓风中心 (NHC)")
             self._ty_provider_cb.setCurrentText("北大西洋飓风")
         else:
-            self._ty_source_label.setText("数据: 中央气象台 (NMC)")
+            self._ty_source_label.setText("数据: 中国中央气象台 (NMC)")
             self._ty_provider_cb.setCurrentText("西北太平洋台风")
     def _on_ty_provider_change(self, txt):
         _cfg.config["typhoon_provider"]="nhc" if "飓风" in txt else "nmc"
@@ -609,6 +616,7 @@ class App(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.warning(self,"⚠️ 台风预警",
             f"{detail}\n\n距离约 {dist}km\n\n请密切关注风暴动态！")
         self._ty_alert_muted = True
+        write_log("台风", "预警已静音")
     def _edit_ty_alert(self): edit_ty_alert(self)
     def _update_ty_status(self):
         km=_cfg.config.get("typhoon_alert_km",800)
@@ -618,6 +626,7 @@ class App(QtWidgets.QMainWindow):
     def _on_ac_off_toggle(self):
         if self._ty_ac_off_sw.isChecked():
             _cfg.config["typhoon_ac_off"]=True; save_config(_cfg.config)
+            write_log("台风", "风暴自动关空调: 已开启")
         else:
             if QtWidgets.QMessageBox.question(self,"⚠️ 安全警示",
                 "当风暴<100km时，说明你可能正处于风暴的核心影响圈，\n"
@@ -630,6 +639,7 @@ class App(QtWidgets.QMainWindow):
             )!=QtWidgets.QMessageBox.Yes:
                 self._ty_ac_off_sw.setChecked(True); return
             _cfg.config["typhoon_ac_off"]=False; save_config(_cfg.config)
+            write_log("台风", "风暴自动关空调: 已关闭")
     def _open_zoom_earth(self):
         QtGui.QDesktopServices.openUrl(QtCore.QUrl(
             f"https://zoom.earth/#view={_cfg.LOCATION['lat']},{_cfg.LOCATION['lon']},8z"))

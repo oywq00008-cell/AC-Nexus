@@ -23,7 +23,8 @@ jobs:
       - run: |
           pip install -r requirements.txt pyinstaller
           pyinstaller --clean --noconfirm BroadlinkAC-linux.spec
-          cd dist && tar czf ../BroadlinkAC-linux.tar.gz BroadlinkAC
+          cp 打不开请看我.txt dist/
+          cd dist && tar czf ../BroadlinkAC-linux.tar.gz BroadlinkAC 打不开请看我.txt
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-linux, path: BroadlinkAC-linux.tar.gz }
 
@@ -37,7 +38,8 @@ jobs:
       - run: |
           pip install -r requirements.txt pyinstaller
           pyinstaller --clean --noconfirm BroadlinkAC.spec
-          Compress-Archive -Path dist/BroadlinkAC.exe -DestinationPath BroadlinkAC-Windows.zip
+          cp 打不开请看我.txt dist/
+          Compress-Archive -Path dist/BroadlinkAC.exe,dist/打不开请看我.txt -DestinationPath BroadlinkAC-Windows.zip
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-Windows, path: BroadlinkAC-Windows.zip }
 
@@ -51,7 +53,8 @@ jobs:
       - run: |
           pip install -r requirements.txt pyinstaller
           pyinstaller --clean --noconfirm BroadlinkAC-macOS.spec
-          cd dist && zip -ry ../BroadlinkAC-macOS.zip BroadlinkAC.app
+          cp 打不开请看我.txt dist/
+          cd dist && zip -ry ../BroadlinkAC-macOS.zip BroadlinkAC.app 打不开请看我.txt
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-macOS, path: BroadlinkAC-macOS.zip }
 

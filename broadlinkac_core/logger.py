@@ -1,30 +1,34 @@
 """BroadlinkAC Core — 日志"""
 
 import re
+import threading
 from datetime import datetime
 from broadlinkac_core.config import LOG_DIR
+
+_log_lock = threading.Lock()
 
 
 def write_log(category: str, msg: str):
     date_str = datetime.now().strftime("%Y-%m-%d")
     log_file = LOG_DIR / f"{date_str}.md"
 
-    if not log_file.exists():
-        log_file.write_text(f"# {date_str} 操作日志\n\n", encoding="utf-8")
+    with _log_lock:
+        if not log_file.exists():
+            log_file.write_text(f"# {date_str} 操作日志\n\n", encoding="utf-8")
 
-    now = datetime.now().strftime("%H:%M")
-    lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+        now = datetime.now().strftime("%H:%M")
+        lines = log_file.read_text(encoding="utf-8").strip().split("\n")
 
-    cat_titles = {"天气": "## 🌤️ 天气", "空调": "## 🎮 空调操作", "台风": "## 🌀 台风监测", "系统": "## ⚙️ 系统"}
-    head = cat_titles.get(category, f"## {category}")
-    if head not in lines:
-        lines.append("")
-        lines.append(head)
-        lines.append("| 时间 | 内容 |")
-        lines.append("|------|------|")
+        cat_titles = {"天气": "## 🌤️ 天气", "空调": "## 🎮 空调操作", "台风": "## 🌀 风暴监测", "系统": "## ⚙️ 系统"}
+        head = cat_titles.get(category, f"## {category}")
+        if head not in lines:
+            lines.append("")
+            lines.append(head)
+            lines.append("| 时间 | 内容 |")
+            lines.append("|------|------|")
 
-    lines.append(f"| {now} | {msg} |")
-    log_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        lines.append(f"| {now} | {msg} |")
+        log_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def read_log(date_str):

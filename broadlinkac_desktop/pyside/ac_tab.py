@@ -163,7 +163,7 @@ def _weather_card(app):
 
     app._wx_feels_block, app._wx_feels_val = _info_item("thermometer.svg", "体感温度", "wx_feels_val")
     app._wx_humid_block, app._wx_humid_val = _info_item("humidity.svg", "湿度", "wx_humid_val")
-    app._wx_wind_block, app._wx_wind_val   = _info_item("windforce.svg", "风力", "wx_wind_val")
+    app._wx_wind_block, app._wx_wind_val   = _info_item("windforce.svg", "风向风力", "wx_wind_val")
 
     ibl.addWidget(app._wx_feels_block)
     _sep1 = QtWidgets.QFrame(); _sep1.setFrameShape(QtWidgets.QFrame.VLine)
@@ -184,6 +184,7 @@ def _weather_card(app):
     bl.setSpacing(4)
     refresh_btn = QtWidgets.QPushButton()
     refresh_btn.setIcon(QtGui.QIcon(str(_base_dir() / "icons" / "refresh.svg")))
+    refresh_btn.setToolTip("刷新天气和预警信息")
     refresh_btn.setIconSize(QtCore.QSize(12, 12))
     refresh_btn.setFixedSize(14, 14)
     refresh_btn.setFlat(True)
@@ -380,7 +381,7 @@ def _schedule_card(app, grid):
     def _refresh_tmpl_cb():
         tmpl_cb.blockSignals(True)
         tmpl_cb.clear()
-        tmpl_cb.addItems(["< 未启用 >"] + list((_cfg.config.get("schedule_templates") or {}).keys()))
+        tmpl_cb.addItems(["< 关闭定时 >"] + list((_cfg.config.get("schedule_templates") or {}).keys()))
         mac = _cfg.config.get("current_device_mac", "")
         dev = _cfg.config.get("devices", {}).get(mac, {})
         active = dev.get("active_template", "")
@@ -394,12 +395,18 @@ def _schedule_card(app, grid):
     def _on_tmpl_switch(t):
         mac = _cfg.config.get("current_device_mac", "")
         dev = _cfg.config.setdefault("devices", {}).setdefault(mac, {})
-        if t == "< 未启用 >":
+        if t == "< 关闭定时 >":
             dev.pop("active_template", None)
             dev["schedule_enabled"] = False
+            _cfg.config["schedule_enabled"] = False
+            from broadlinkac_core.logger import write_log
+            write_log("定时", "已关闭")
         else:
             dev["active_template"] = t
             dev["schedule_enabled"] = True
+            _cfg.config["schedule_enabled"] = True
+            from broadlinkac_core.logger import write_log
+            write_log("定时", f"已开启 → {t}")
         save_config(_cfg.config)
         from broadlinkac_core.scheduler import register_all_jobs
         import broadlinkac_core.scheduler as _sched
