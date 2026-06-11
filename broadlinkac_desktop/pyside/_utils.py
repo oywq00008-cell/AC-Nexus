@@ -88,7 +88,16 @@ def frm():
     f = QtWidgets.QFrame()
     f.setObjectName("card")
     f.setStyleSheet(_build_card_qss())
+    f.setGraphicsEffect(_card_shadow())
     return f
+
+
+def _card_shadow():
+    shadow = QtWidgets.QGraphicsDropShadowEffect()
+    shadow.setBlurRadius(16)
+    shadow.setOffset(0, 2)
+    shadow.setColor(QtGui.QColor(0, 0, 0, 25))
+    return shadow
 
 
 def _build_card_qss():

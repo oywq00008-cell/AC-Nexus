@@ -92,12 +92,13 @@ class App(QtWidgets.QMainWindow):
             background: #2F80ED;
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             min-height: 36px;
             font-weight: bold;
             padding: 0 20px;
         }
         QPushButton#primary:hover { background: #3A8FFF; }
+        QPushButton#primary:pressed { background: #1E6FD9; }
         QMenuBar {
             background: white;
             border-bottom: 1px solid #E5E7EB;
@@ -107,7 +108,45 @@ class App(QtWidgets.QMainWindow):
         }
         QPushButton {
             min-height: 34px;
+            border-radius: 12px;
+            padding: 4px 14px;
+            border: 1px solid #DEDEDE;
+            background: #FAFAFA;
+            color: #333;
+        }
+        QPushButton:hover {
+            background: #F0F0F0;
+            border-color: #CCC;
+        }
+        QPushButton:pressed {
+            background: #E5E5E5;
+        }
+        QComboBox {
+            min-height: 34px;
+            border-radius: 10px;
+            padding: 4px 12px;
+            border: 1px solid #DEDEDE;
+            background: #FAFAFA;
+            color: #333;
+        }
+        QComboBox:hover {
+            border-color: #BBB;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 28px;
+            border-left: 1px solid #E5E7EB;
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+        QComboBox QAbstractItemView {
+            border: 1px solid #DEDEDE;
             border-radius: 8px;
+            padding: 4px;
+            selection-background-color: #E8F0FE;
+            selection-color: #2F80ED;
+            outline: none;
         }
     """
 
@@ -608,7 +647,7 @@ class App(QtWidgets.QMainWindow):
 def main():
     from broadlinkac_core import init; init()
     app = QtWidgets.QApplication(sys.argv); app.setApplicationName(APP_NAME)
-    if IS_WIN: app.setStyle("Fusion")
+    app.setStyle("Fusion")
     # 加载内置字体
     fonts_dir = Path(__file__).resolve().parent.parent / "fonts"
     for fname in ["HarmonyOS_Sans_SC_Regular.ttf", "NotoColorEmoji-Regular.ttf"]:

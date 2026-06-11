@@ -51,7 +51,7 @@ jobs:
       - run: |
           pip install -r requirements.txt pyinstaller
           pyinstaller --clean --noconfirm BroadlinkAC-macOS.spec
-          cd dist && zip -r ../BroadlinkAC-macOS.zip BroadlinkAC.app
+          cd dist && zip -ry ../BroadlinkAC-macOS.zip BroadlinkAC.app
       - uses: actions/upload-artifact@v4
         with: { name: BroadlinkAC-macOS, path: BroadlinkAC-macOS.zip }
 

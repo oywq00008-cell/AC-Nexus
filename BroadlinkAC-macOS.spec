@@ -36,6 +36,8 @@ a = Analysis(
         'PySide6.QtSerialPort', 'PySide6.QtSql', 'PySide6.QtTest',
         'PySide6.QtHelp', 'PySide6.QtLocation', 'PySide6.QtPositioning',
         'PySide6.QtTextToSpeech', 'PySide6.QtWebChannel',
+        'PySide6.QtPdf', 'PySide6.QtPdfWidgets',
+        'PySide6.QtDBus',
     ],
     noarchive=False,
     optimize=0,
