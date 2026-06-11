@@ -1,12 +1,8 @@
-# 🎮 BroadlinkAC v3A
+# 🎮 BroadlinkAC v5.0
 
 [中文](README.md) | English
 
-BroadlinkAC is more than a desktop AC remote — it's an **IR control protocol stack built for AI Agents**. Plug in a Broadlink RM IR blaster, and any AI Agent can control **17 AC brands** (Gree, Hitachi, Daikin, etc.) with a single line of Python: `import broadlinkac_core`. Multi-device parallel scheduling, outdoor-temperature-aware auto-adjust, typhoon alerts — the desktop app and headless Agent mode share the exact same core. Windows, macOS & Linux, works out of the box.
-
-![Main UI](assets/screenshot-main.png)
-![Typhoon Tracking](assets/screenshot-typhoon.png)
-![Settings](assets/screenshot-settings.png)
+BroadlinkAC is more than a desktop AC remote — it's an **IR control protocol stack built for AI Agents**. Plug in a Broadlink RM IR blaster, and any AI Agent can control **17 AC brands** (Gree, Hitachi, Daikin, etc.) with a single line of Python: `import broadlinkac_core`. Multi-device parallel scheduling, outdoor-temperature-aware auto-adjust, typhoon path forecasting — the desktop app (PySide6) and headless Agent mode share the exact same core. Windows, macOS & Linux, works out of the box.
 
 ## 🤖 Agent API
 
@@ -34,8 +30,6 @@ if dist < 100:
 
 No GUI needed — `pip install -r requirements-core.txt` is enough.
 
-> `send_ac` only guarantees power/mode/temp/fan — the minimum common set across all brands. If your AC supports turbo, swing, etc., your Agent can extend `broadlinkac_core/ac_control.py` with optional parameters.
-
 ## 🎯 Supported AC Brands
 
 The core supports all **17 protocols** (desktop dropdown shows 10 Chinese brands).
@@ -57,19 +51,19 @@ The core supports all **17 protocols** (desktop dropdown shows 10 Chinese brands
 | 现代 | `hyundai` | hvac_ir |
 | Fuego | `fuego` | hvac_ir |
 
-Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — both resolve automatically. Additional hvac_ir brands not listed (e.g. `carriernqv`, `daikin2`) also work by passing the module name directly.
+Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — both resolve automatically.
 
 ## ✨ Features
 
 - 📡 **Multi-device** — LAN auto-discovery, dropdown switch, offline label
-- ⏰ **Parallel scheduling** — Per-device independent timers and auto-adjust
-- 🌡️ **Temperature rules** — Adaptive cool/heat based on outdoor temp
+- ⏰ **Schedule templates** — Multi-group timers (workdays vs weekends)
+- 🌡️ **Smart temp control** — Adaptive cool/heat based on outdoor temperature
 - 🌤️ **Dual weather** — Baidu / QWeather API, one-click switch
-- 🌀 **Dual storm source** — NW Pacific (NMC) + N. Atlantic hurricanes (NHC)
+- 🌀 **Dual storm source** — NW Pacific (NMC) + N. Atlantic hurricanes (NHC), path forecast
 - 🌪️ **Storm protection** — Auto-shutdown all ACs when storm < 100km
-- ⚠️ **Alerts** — Local warnings with 10-sec auto-dismiss
-- 🎨 **Brand logos** — Dynamic control panel icon
-- 📋 **Activity log** — Daily auto-logging
+- ⚠️ **Alerts** — Typhoon tracking + local weather warnings, split layout
+- 🎨 **Dark theme** — Light/dark mode toggle
+- 📋 **Activity log** — Browse by date
 - 🔧 **Diagnostics** — One-click health check
 
 ## 🧰 Hardware
@@ -79,11 +73,9 @@ Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — 
 
 ## 📡 Deploy on OpenWRT Router
 
-Want **24/7 headless operation** (router daemon, typhoon auto-protection, auto-adjust)? Check out the sister project:
-
 > **[BroadlinkAC-OpenWRT](https://github.com/oywq00008-cell/BroadlinkAC-OpenWRT)** — LuCI control panel + procd daemon + IPK one-click install
 
-Both projects share the core algorithm and IR protocols, but evolve independently: desktop focuses on user interaction, router focuses on safe degradation.
+Both projects share the core algorithm and IR protocols, evolving independently.
 
 ## 🚀 Quick Start
 
@@ -95,8 +87,6 @@ Both projects share the core algorithm and IR protocols, but evolve independentl
 | 🍎 macOS | [BroadlinkAC.app](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-macOS.zip) |
 | 🐧 Linux | [BroadlinkAC-linux](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-linux.tar.gz) |
 
-> 💡 All packages are auto-built by GitHub Actions and updated with every release.
-
 macOS first run:
 ```bash
 xattr -cr /Applications/BroadlinkAC.app
@@ -107,7 +97,7 @@ From source:
 git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
 cd BroadlinkAC-For-Agent
 pip install -r requirements.txt
-python ac_controller.py
+python ac_controller_pyside6.py
 ```
 
 ### Agent / Headless
@@ -129,22 +119,29 @@ Fill in weather API key via Settings on first run (Baidu 5k/day or QWeather 50k/
 ## 📁 Project Structure
 
 ```
-ac_controller.py              # Entry point
+ac_controller_pyside6.py      # PySide6 entry point
 broadlinkac_core/             # Core library (zero GUI deps)
 ├── __init__.py               # Public API
 ├── config.py                 # Config + resolve_brand() + device mgmt
 ├── weather.py                # Dual-source weather + alerts
-├── typhoon.py                # Typhoon (NMC) + Hurricane (NHC) + threat eval
+├── typhoon.py                # Typhoon (NMC) + Hurricane (NHC) + KMZ forecast
 ├── ac_control.py             # AC control + dynamic protocol import
-├── scheduler.py              # Scheduling
+├── scheduler.py              # Scheduling (multi-group templates)
 └── logger.py                 # Logging
-broadlinkac_desktop/          # Desktop GUI
-└── app.py
-protocols/                    # Custom IR protocols (haier/aux_ac/panasonic)
+broadlinkac_desktop/          # PySide6 desktop GUI
+├── app_pyside6.py            # Main window
+└── pyside/                   # UI modules
+    ├── ac_tab.py             # AC + Weather + Timer + Rules
+    ├── ty_tab.py             # Typhoon + Alerts + Forecast chart
+    ├── dialogs.py            # All dialogs
+    └── _utils.py             # Utilities
+protocols/                    # Custom IR protocols
 logos/                        # Brand logos
-assets/                       # Screenshots
-skill/                        # Agent Skill definition (SKILL.md)
-BroadlinkAC.spec              # PyInstaller config
+fonts/                        # Fonts (HarmonyOS Sans SC)
+icons/                        # SVG icon system
+BroadlinkAC.spec              # Windows build
+BroadlinkAC-macOS.spec        # macOS build
+BroadlinkAC-linux.spec        # Linux build
 requirements.txt              # Full deps
 requirements-core.txt         # Agent-only deps
 ```
@@ -164,3 +161,4 @@ MIT License
 - [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ protocol reference
 - [QWeather](https://www.qweather.com) / [Baidu Maps](https://lbsyun.baidu.com) — Weather data
 - [China NMC](https://www.nmc.cn) — Typhoon data
+- [NHC](https://www.nhc.noaa.gov) — Atlantic hurricane data
