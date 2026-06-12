@@ -32,7 +32,7 @@ No GUI needed — `pip install -r requirements-core.txt` is enough.
 
 ## 🎯 Supported AC Brands
 
-The core supports all **17 protocols** (desktop dropdown shows 10 Chinese brands).
+The core supports all **17 protocols**, now fully available in the desktop dropdown with brand logos.
 
 | Brand (CN) | Brand (EN) | Protocol Source |
 |------------|------------|-----------------|
