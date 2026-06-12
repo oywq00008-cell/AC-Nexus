@@ -343,6 +343,8 @@ def update_brand_logo(app):
         "海尔": "haier", "华凌": "wahin", "海信": "hisense",
         "大金": "daikin", "三菱": "mitsubishi", "小米": "xiaomi",
         "松下": "panasonic",
+        "日立": "hitachi", "富士通": "fujitsu", "巴鲁": "ballu",
+        "开利": "carrier", "现代": "hyundai", "Fuego": "fuego",
     }
     logo_file = LOGO_NAME.get(brand_cn, brand_key)
     try:
