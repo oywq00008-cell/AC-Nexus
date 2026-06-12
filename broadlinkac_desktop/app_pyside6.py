@@ -188,8 +188,12 @@ class App(QtWidgets.QMainWindow):
 
     def _restore_from_tray(self): self.show(); self.raise_(); self.activateWindow()
     def _quit_from_tray(self):
-        if hasattr(self, '_tray') and self._tray: self._tray.stop()
-        QtWidgets.QApplication.quit()
+        import os, threading
+        if hasattr(self, '_tray') and self._tray:
+            self._tray.stop()
+            self._tray = None
+        # 0.3 秒后硬退 — 用 threading.Timer 避免依赖 Qt 事件循环
+        threading.Timer(0.3, lambda: os._exit(0)).start()
     def _on_exit(self):
         if IS_MAC: self.close()
         else: self._quit_from_tray()
