@@ -226,6 +226,7 @@ def _control_card(app):
 
     app._logo_lbl = QtWidgets.QLabel()
     app._logo_lbl.setFixedSize(80, 56)
+    app._logo_lbl.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTop)
     tl.addWidget(app._logo_lbl, alignment=QtCore.Qt.AlignTop)
     cv.addWidget(title_row)
 
