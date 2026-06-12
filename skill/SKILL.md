@@ -138,6 +138,51 @@ for a in alerts:
     print(f"[{a['severity']}] {a['headline']}")
 ```
 
+## Scheduling & Automation
+
+The background scheduler starts automatically after `init()`. Agent can read/write config directly.
+
+### Read current schedule
+```python
+from broadlinkac_core import init
+init()
+dev = _cfg.config["devices"]["your_mac"]
+print(dev.get("active_template"))     # Current template name
+print(dev.get("schedule_enabled"))    # True/False
+```
+
+### Enable/disable schedule
+```python
+import broadlinkac_core.config as _cfg
+from broadlinkac_core import init
+init()
+dev = _cfg.config["devices"]["your_mac"]
+dev["schedule_enabled"] = True
+_cfg.save_config(_cfg.config)
+```
+
+### Create a schedule template (multi-group)
+```python
+templates = _cfg.config.setdefault("schedule_templates", {})
+templates["工作日"] = {
+    "groups": [{
+        "days": [1, 2, 3, 4, 5],         # Monday-Friday
+        "slots": [{
+            "on": "08:00", "on_enabled": True,
+            "off": "18:00", "off_enabled": True
+        }]
+    }]
+}
+dev["active_template"] = "工作日"
+_cfg.save_config(_cfg.config)
+```
+
+### Enable auto-adjust (every 2 hours based on outdoor temp)
+```python
+dev["auto_adjust"] = True
+_cfg.save_config(_cfg.config)
+```
+
 ## Desktop GUI
 
 Pre-built installers (Windows/macOS/Linux), auto-built by GitHub Actions. Download from [Releases](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest).
