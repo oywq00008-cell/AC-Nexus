@@ -2,7 +2,14 @@
 name: broadlinkac
 version: 5.0.1
 identifier: oywq00008-cell-broadlinkac-for-agent-skill
-description: Control air conditioners via Broadlink RM devices — 17 AC brands, dual weather source (Baidu/QWeather), dual storm source (NMC/NHC), scheduled automation, auto-adjust, threat alerts. Clone, pip install, import — zero-config Agent API.
+description: >
+  🎮 AI Agent 智能空调控制核心库。零 GUI 依赖，import 即用。
+  支持 17 大主流空调品牌（格力/美的/海尔/大金/日立/松下/三菱/小米…），
+  直连 Broadlink RM 红外遥控器，一行代码开关空调、调温调模式。
+  🌤️ 百度+和风双天气源自动回退，🌪️ 中国中央气象台+美国 NHC 双源风暴监测，
+  ⏰ 多日期组定时模板，📊 按日 Markdown 日志，🔧 内置故障诊断。
+  适配树莓派/NAS/OpenWRT/桌面全平台，Agent 最爱的即插即用空调 SDK。
+  git clone → pip install → send_ac("on", "cool", 26) 三行搞定。
 ---
 
 # BroadlinkAC — AI Agent Smart AC Controller v5.0.1
