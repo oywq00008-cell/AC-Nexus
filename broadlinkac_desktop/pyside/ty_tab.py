@@ -433,7 +433,8 @@ def _do_render_alerts(app):
             app._alert_content_layout.addWidget(sep)
         sev = a.get("severity", "minor")
         card = frm(); cl = QtWidgets.QVBoxLayout(card); cl.setContentsMargins(8, 4, 8, 4)
-        cl.addWidget(lbl(f"{sev_cn.get(sev, sev)}预警 {a.get('headline', '')}", bold=True, color=sev_color.get(sev, "#888")))
+        prefix = f"{sev_cn[sev]}预警 " if sev in sev_cn else ""
+        cl.addWidget(lbl(f"{prefix}{a.get('headline', '')}", bold=True, color=sev_color.get(sev, "#888")))
         if a.get("senderName"): cl.addWidget(lbl(a["senderName"], color="gray"))
         if a.get("description"):
             desc = QtWidgets.QLabel(a["description"])
