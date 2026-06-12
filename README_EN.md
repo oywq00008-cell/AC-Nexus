@@ -66,6 +66,17 @@ Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — 
 - 📋 **Activity log** — Browse by date
 - 🔧 **Diagnostics** — One-click health check
 
+## Screenshot
+
+
+| main | 
+|--------|
+ ![主界面](assets/screenshot-main.png) |
+
+| settings | warning |
+|--------|----------|
+ ![设置](assets/screenshot-settings.png) | ![预警信息](assets/screenshot-typhoon.png) |
+ 
 ## 🧰 Hardware
 
 - Python 3.9+ (macOS / Windows / Linux / Raspberry Pi / NAS)
@@ -158,4 +169,4 @@ MIT License
 - [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ protocol reference
 - [QWeather](https://www.qweather.com) / [Baidu Maps](https://lbsyun.baidu.com) — Weather data
 - [China NMC](https://www.nmc.cn) — Storm data
-- [NHC](https://www.nhc.noaa.gov) — Atlantic hurricane data
+- [USA NHC](https://www.nhc.noaa.gov) — Atlantic hurricane data
