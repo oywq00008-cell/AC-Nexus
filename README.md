@@ -70,13 +70,13 @@ Agent 传参 `brand="日立"` 或 `brand="hitachi"` 均可自动解析。
 
 ## 📸 界面截图
 
-| 主界面 | 预警信息 |
-|--------|----------|
-- ![主界面](assets/screenshot-main.png) | ![预警信息](assets/screenshot-typhoon.png) |
+| 主界面 | 
+|--------|
+ ![主界面](assets/screenshot-main.png) |
 
-| 设置 |
-|------|
-- ![设置](assets/screenshot-settings.png) |
+| 设置 | 预警信息 |
+|--------|----------|
+ ![设置](assets/screenshot-settings.png) | ![预警信息](assets/screenshot-typhoon.png) |
 
 ## 🧰 硬件要求
 
