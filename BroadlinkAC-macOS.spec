@@ -8,7 +8,7 @@ pyside_hidden = [
 
 a = Analysis(
     ['ac_controller_pyside6.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=[
         ('protocols', 'protocols'),
@@ -81,5 +81,8 @@ app = BUNDLE(
     info_plist={
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '10.13',
+        'CFBundleDisplayName': 'BroadlinkAC',
+        'CFBundleName': 'BroadlinkAC',
+        'CFBundleShortVersionString': '5.0.1',
     },
 )
