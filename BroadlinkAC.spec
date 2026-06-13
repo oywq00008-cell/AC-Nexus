@@ -13,6 +13,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('protocols', 'protocols'),
+        ('hvac_ir', 'hvac_ir'),
         ('logos', 'logos'),
         ('fonts', 'fonts'),
         ('icons', 'icons'),

@@ -12,6 +12,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('protocols', 'protocols'),
+        ('hvac_ir', 'hvac_ir'),
         ('logos', 'logos'),
         ('fonts/HarmonyOS_Sans_SC_Regular.ttf', 'fonts'),
         ('icons', 'icons'),
