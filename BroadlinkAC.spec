@@ -27,6 +27,7 @@ a = Analysis(
         'broadlinkac_desktop.pyside', 'broadlinkac_desktop.pyside.ac_tab',
         'broadlinkac_desktop.pyside.ty_tab', 'broadlinkac_desktop.pyside.dialogs',
         'broadlinkac_desktop.pyside._utils',
+        'schedule',
     ] + pyside_hidden + collect_submodules('hvac_ir'),
     hookspath=[],
     hooksconfig={},

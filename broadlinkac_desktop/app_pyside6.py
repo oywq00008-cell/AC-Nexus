@@ -256,6 +256,21 @@ class App(QtWidgets.QMainWindow):
             alerts, self._ty_ac_off_sent = judge_and_shutdown(
                 write_log, self._ty_alert_muted, self._ty_ac_off_sent)
             for detail, dist in alerts: self._show_ty_alert(detail, dist)
+            # 所有台风离开预警范围后自动解除静音，确保新台风出现时能再次弹窗
+            if self._ty_alert_muted:
+                from broadlinkac_core.typhoon import calc_distance
+                alert_km = _cfg.config.get("typhoon_alert_km", 800)
+                any_in_range = False
+                for t in self._ty_data:
+                    d = t.get("detail")
+                    if d:
+                        dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
+                                            d["lat"], d["lon"])
+                        if dist < alert_km:
+                            any_in_range = True
+                            break
+                if not any_in_range:
+                    self._ty_alert_muted = False
         except Exception as e:
             write_log("系统", f"[台风周期] 异常: {e}")
         finally:

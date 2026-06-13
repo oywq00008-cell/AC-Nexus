@@ -11,7 +11,9 @@ from broadlinkac_core.weather import fetch_weather
 from broadlinkac_core.ac_control import send_ac, decide_ac, MODE_KEYS
 from broadlinkac_core.logger import write_log, get_last_ac_state
 
-_sched_lock = threading.RLock()  # 可重入锁，register_all_jobs 内部自锁
+_sched_lock = threading.RLock()
+_sched_event = threading.Event()
+_sched_thread = None
 
 
 def _device_online(mac):
@@ -163,8 +165,8 @@ def _migrate_schedule_config():
     save_config(_cfg.config)
 
 
-def register_all_jobs():
-    """注册所有设备的 AC 定时任务，内部持有 _sched_lock"""
+def _do_register():
+    """纯注册逻辑：清空并重新注册所有设备的定时任务。返回是否有任务。"""
     with _sched_lock:
         sch.clear()
         _migrate_schedule_config()
@@ -194,23 +196,43 @@ def register_all_jobs():
                     sch.every().day.at(dev["off_time"]).do(scheduled_off_job, mac=mac)
             if dev.get("auto_adjust", True):
                 sch.every(2).hours.do(auto_adjust_job, mac=mac)
+    return bool(sch.get_jobs())
+
+
+def register_all_jobs():
+    """公开接口：注册任务 + 确保调度线程存活/唤醒"""
+    _do_register()
+    start_scheduler()
 
 
 def scheduler_loop():
-    register_all_jobs()
+    """调度守护线程主循环：异常自动重生，无任务自动退出"""
     while True:
-        with _sched_lock:
-            sch.run_pending()
-        time.sleep(max(sch.idle_seconds(), 0) if sch.idle_seconds() is not None else 15)
-
-
-_sched_started = False
+        try:
+            has_jobs = _do_register()
+            if not has_jobs:
+                return
+            while True:
+                idle = sch.idle_seconds()
+                timeout = max(idle, 0) if idle is not None else 30
+                if _sched_event.wait(timeout=timeout):
+                    _sched_event.clear()
+                    break
+                with _sched_lock:
+                    sch.run_pending()
+        except Exception as e:
+            try:
+                write_log("系统", f"调度器异常，5秒后重启: {e}")
+            except Exception:
+                pass
+            time.sleep(5)
 
 
 def start_scheduler():
-    """启动后台调度线程（幂等，仅首次调用生效）"""
-    global _sched_started
-    if _sched_started:
+    """确保调度线程存活：已死则重建，存活则唤醒"""
+    global _sched_thread
+    if _sched_thread and _sched_thread.is_alive():
+        _sched_event.set()
         return
-    _sched_started = True
-    threading.Thread(target=scheduler_loop, daemon=True).start()
+    _sched_thread = threading.Thread(target=scheduler_loop, daemon=True)
+    _sched_thread.start()
