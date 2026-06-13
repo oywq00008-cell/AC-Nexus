@@ -589,9 +589,14 @@ def open_repair(app):
             except Exception: return False
 
         def _http_ok():
-            """HTTP 联网检测（ICMP 可能被防火墙屏蔽）"""
+            """HTTP 联网检测（打包后无系统证书链，需跳过 SSL 验证）"""
+            import ssl
             try:
-                urllib.request.urlopen("https://www.baidu.com", timeout=5)
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request("https://www.baidu.com", headers={"User-Agent": "BroadlinkAC/5.0"})
+                urllib.request.urlopen(req, timeout=5, context=ctx)
                 return True
             except Exception:
                 return False
