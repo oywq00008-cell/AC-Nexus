@@ -17,6 +17,18 @@ def _urlopen(url, timeout=8):
     return urllib.request.urlopen(req, timeout=timeout, context=ctx)
 
 
+def _normalize_obs_time(raw):
+    """归一化观测时间 → 'YYYY-MM-DD HH:MM'"""
+    if not raw:
+        return ""
+    s = str(raw).strip()
+    if 'T' in s:
+        return s[:16].replace('T', ' ')      # 和风 ISO 格式
+    if len(s) >= 12 and s.isdigit():
+        return f"{s[:4]}-{s[4:6]}-{s[6:8]} {s[8:10]}:{s[10:12]}"  # 百度数字串
+    return s[:16]
+
+
 def fetch_weather():
     """获取实况天气（根据 provider 路由，未明确指定时降级）"""
     provider = _cfg.config.get("weather_provider", "baidu")
@@ -84,7 +96,7 @@ def _fetch_weather_baidu():
                 "windDir": n["wind_dir"],
                 "windScale": n["wind_class"].replace("级", ""),
                 "feelsLike": str(n["feels_like"]),
-                "obsTime": n.get("uptime", ""),
+                "obsTime": _normalize_obs_time(n.get("uptime", "")),
             }
     except Exception as e:
         print(f"[百度实况] {e}")
@@ -128,7 +140,9 @@ def _fetch_weather_qweather():
         raw = _urlopen(url).read()
         data = json.loads(gzip.decompress(raw))
         if data["code"] == "200":
-            return data["now"]
+            now = data["now"]
+            now["obsTime"] = _normalize_obs_time(now.get("obsTime", ""))
+            return now
     except Exception as e:
         print(f"[和风天气] {e}")
     return None
