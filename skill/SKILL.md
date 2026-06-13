@@ -1,13 +1,22 @@
 ---
 name: broadlinkac
-version: 5.0.1
+version: 5.0.2
 identifier: oywq00008-cell-broadlinkac-for-agent-skill
 description: 🎮 AI Agent 智能空调控制核心库 — 零 GUI 依赖，import 即用。支持 17 大品牌空调（格力/美的/海尔/大金等），直连 Broadlink RM 红外遥控器。百度+和风双天气源，中央气象台+NHC 双风暴源，多日期组定时模板，Markdown 日志，故障诊断。适配树莓派/NAS/OpenWRT/桌面全平台。
 ---
 
-# BroadlinkAC — AI Agent Smart AC Controller v5.0.1
+# BroadlinkAC — AI Agent Smart AC Controller v5.0.2
 
 Cross-platform AC control library for Broadlink RM series IR blasters. **Zero GUI dependency** — designed for AI agents to clone, install, and control air conditioners programmatically.
+
+## ⚠️ Safety & Persistence
+
+> **This skill writes durable state to the user's machine.** `init()` creates `~/.ac_controller/config.json` (API keys, device config, schedule templates) and starts a background scheduler daemon thread. The scheduler survives agent task completion — scheduled on/off times, auto-adjust, and storm auto-shutdown will continue to run autonomously. **Always confirm with the user before:**
+> - Modifying or creating schedule templates
+> - Enabling auto-adjust or typhoon auto-shutdown
+> - Changing device configuration (brand, temperature rules, location)
+>
+> To fully disable automation: set `schedule_enabled=False` and `auto_adjust=False` for the device, then call `_cfg.save_config(_cfg.config)`.
 
 ## Quick Start (Agent)
 
@@ -48,7 +57,7 @@ if dist < 100:
 ### Setup
 | Function | Description |
 |----------|-------------|
-| `init(baidu_key=None, api_key=None, qw_host=None, location=None, brand=None)` | Initialize config + start background scheduler. Idempotent — safe to call multiple times. |
+| `init(baidu_key=None, api_key=None, qw_host=None, location=None, brand=None)` | Initialize config + start background scheduler. **Writes to `~/.ac_controller/config.json`**. Idempotent — safe to call multiple times. |
 
 ### AC Control (17 brands)
 | Function | Description |
@@ -139,6 +148,8 @@ for a in alerts:
 ```
 
 ## Scheduling & Automation
+
+> ⚠️ **All schedule changes are persistent** — they survive Python process exit and will be executed by the background scheduler daemon. Always confirm with the user before enabling or modifying schedules.
 
 The background scheduler starts automatically after `init()`. Agent can read/write config directly.
 
