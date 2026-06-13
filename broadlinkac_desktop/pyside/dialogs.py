@@ -463,10 +463,8 @@ def open_settings(app):
     def save():
         _cfg.config["weather_provider"] = "qweather" if "和风" in provider_cb.currentText() else "baidu"
         _cfg.config["baidu_key"] = bd_entry.text().strip()
-        _cfg.config["api_key"] = qw_key.text().strip()
-        _cfg.config["qw_host"] = qw_host.text().strip()
-        _cfg.config.pop("qweather_key", None)
-        _cfg.config.pop("qweather_host", None)
+        _cfg.config["qweather_key"] = qw_key.text().strip()
+        _cfg.config["qweather_host"] = qw_host.text().strip()
         _cfg.config["brand"] = brand_cb.currentText()
         _cfg.config["appearance_mode"] = {v: k for k, v in mode_map.items()}.get(theme_cb.currentText(), "system")
         if hasattr(dl, "_picked_loc"):
