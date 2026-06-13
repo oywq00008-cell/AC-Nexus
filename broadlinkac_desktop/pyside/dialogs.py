@@ -661,7 +661,9 @@ def open_repair(app):
                 lon, lat = _cfg.LOCATION["lon"], _cfg.LOCATION["lat"]
                 url = f"https://api.map.baidu.com/weather/v1/?location={lon},{lat}&coordtype=wgs84&data_type=now&ak={bd_key}"
                 req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC/2.0"})
-                resp = urllib.request.urlopen(req, timeout=6)
+                import ssl
+                ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+                resp = urllib.request.urlopen(req, timeout=6, context=ctx)
                 data = json.loads(resp.read())
                 if data.get("status") == 0:
                     push(lines, "│ ✅ API 请求成功", "#27AE60")
