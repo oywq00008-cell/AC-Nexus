@@ -169,7 +169,9 @@ class App(QtWidgets.QMainWindow):
         if IS_MAC: return
         try:
             import pystray; from PIL import Image
-            img = Image.open(self._get_asset("broadlink.png"))
+            # Windows 用 ICO（支持透明），其他平台用 PNG
+            asset = "broadlink.ico" if IS_WIN else "broadlink.png"
+            img = Image.open(self._get_asset(asset))
             menu = pystray.Menu(
                 pystray.MenuItem("显示", self._restore_from_tray, default=True),
                 pystray.MenuItem("退出", self._quit_from_tray),
@@ -677,6 +679,12 @@ def main():
     from broadlinkac_core import init; init()
     app = QtWidgets.QApplication(sys.argv); app.setApplicationName(APP_NAME)
     app.setStyle("Fusion")
+    # 设置窗口/任务栏图标
+    ico_path = Path(__file__).resolve().parent.parent / "broadlink.ico"
+    if not ico_path.exists():
+        ico_path = Path(sys._MEIPASS) / "broadlink.ico"
+    if ico_path.exists():
+        app.setWindowIcon(QtGui.QIcon(str(ico_path)))
     # 加载内置字体
     fonts_dir = Path(__file__).resolve().parent.parent / "fonts"
     for fname in ["HarmonyOS_Sans_SC_Regular.ttf", "NotoColorEmoji-Regular.ttf"]:
