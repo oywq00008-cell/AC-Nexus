@@ -77,6 +77,8 @@ def get_last_ac_state():
         for line in reversed(log_file.read_text(encoding="utf-8").strip().split("\n")):
             if not re.search(r"\[\d{2}:\d{2}\]", line):
                 continue
+            if "不更改温度" in line:
+                continue
             if any(w in line for w in OFF_WORDS):
                 return {"power": "off", "mode": "cool", "temp": 26}
             if any(w in line for w in ON_WORDS):
@@ -87,8 +89,6 @@ def get_last_ac_state():
                     mode = _LOG_MODES.get(m.group(1), "cool")
                     temp = int(m.group(2))
                 return {"power": "on", "mode": mode, "temp": temp}
-            if "不更改温度" in line:
-                continue
         # 文件存在但没匹配到 → 继续往前找
 
     return {"power": "unknown", "mode": "cool", "temp": 26}
