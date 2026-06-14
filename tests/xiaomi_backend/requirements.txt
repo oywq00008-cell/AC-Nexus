@@ -1,0 +1,9 @@
+# 小米空调伴侣后端集成 — 依赖
+keyring>=25.0.0         # 系统钥匙串
+python-miio>=0.5.12     # 米家设备控制
+qrcode>=7.4.0           # 终端二维码生成
+qrcode_terminal>=0.8.0  # 终端 ASCII 二维码
+Pillow>=9.0.0           # 图片处理
+pycryptodome>=3.20.0    # 小米协议加密
+requests>=2.31.0        # HTTP 请求
+colorama>=0.4.6         # 终端彩色输出
