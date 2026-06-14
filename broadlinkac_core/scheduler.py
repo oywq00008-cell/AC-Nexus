@@ -65,8 +65,11 @@ def scheduled_off_job(mac):
     if not _device_online(mac):
         write_log("系统", f"⏰ [{name}] 定时关机 → 设备离线，跳过")
         return None
-    # 检测空调状态：已关则跳过
+    # 检测空调状态：未知或已关则跳过
     state = get_last_ac_state()
+    if state["power"] == "unknown":
+        write_log("系统", f"⏰ [{name}] 定时关机 → 无法判定空调状态，跳过")
+        return None
     if state["power"] == "off":
         return None
     # 台风保护：已被台风关机的跳过
@@ -93,6 +96,9 @@ def auto_adjust_job(mac):
         write_log("系统", f"🔄 [{name}] 自动调温 → 设备离线，跳过")
         return
     state = get_last_ac_state()
+    if state["power"] == "unknown":
+        write_log("系统", f"🔄 [{name}] 自动调温 → 无法判定空调状态，跳过")
+        return
     if state["power"] == "off":
         return
 

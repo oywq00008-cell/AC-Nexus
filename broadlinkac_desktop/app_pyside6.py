@@ -188,7 +188,8 @@ class App(QtWidgets.QMainWindow):
         if IS_MAC: event.accept()
         else: self.hide(); event.ignore()
 
-    def _restore_from_tray(self): self.show(); self.raise_(); self.activateWindow()
+    def _restore_from_tray(self):
+        self._ui(lambda: [self.show(), self.raise_(), self.activateWindow()])
     def _quit_from_tray(self):
         import os, threading
         if hasattr(self, '_tray') and self._tray:
