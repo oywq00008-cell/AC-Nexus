@@ -1,13 +1,14 @@
 """
 松下 / Panasonic 空调红外协议 (NKE/DKE 系列)
 基于 IRremoteESP8266 ir_Panasonic.h v2.8.3 移植
+2026-06-15 修正: LSB-first 位序、时序常量精确匹配 IRremote
 """
 
-HDR_MARK = 3500
-HDR_SPACE = 1750
-BIT_MARK = 435
-ONE_SPACE = 1300
-ZERO_SPACE = 480
+HDR_MARK = 3456
+HDR_SPACE = 1728
+BIT_MARK = 432
+ONE_SPACE = 1296
+ZERO_SPACE = 432
 MSG_SPACE = 10000
 
 # 模式
@@ -57,7 +58,7 @@ class Panasonic:
             self.space(ZERO_SPACE)
 
     def send_byte(self, byte):
-        for i in range(7, -1, -1):
+        for i in range(8):  # LSB first — IRremote sendGeneric(false)
             self.bit((byte >> i) & 1)
 
     def calc_checksum(self, data):

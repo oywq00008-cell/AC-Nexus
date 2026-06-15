@@ -121,12 +121,12 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
         cls_name = cls_map.get(brand, brand.capitalize())
         sender = getattr(mod, cls_name)()
         mode_maps = {
-            "haier": {"auto": 0x00, "cool": 0x01, "dry": 0x02, "fan": 0x04, "heat": 0x03},
+            "haier": {"auto": 0, "cool": 0, "dry": 1, "fan": 3, "heat": 2},
             "aux_ac": {"auto": 0, "cool": 1, "dry": 2, "fan": 6, "heat": 4},
             "panasonic": {"auto": 0, "cool": 3, "dry": 2, "fan": 6, "heat": 4},
         }
         fan_maps = {
-            "haier": {"auto": 0x00, "1": 0x01, "2": 0x02, "3": 0x03},
+            "haier": {"auto": 5, "1": 1, "2": 2, "3": 3},
             "aux_ac": {"auto": 5, "1": 1, "2": 2, "3": 3},
             "panasonic": {"auto": 7, "1": 3, "2": 2, "3": 1},
         }
