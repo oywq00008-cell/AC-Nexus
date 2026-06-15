@@ -252,8 +252,9 @@ def _control_card(app):
             font-weight: bold;
             font-size: 11px;
             border: none;
-            padding: 2px 10px;
-            min-height: 18px;
+            padding: 2px 18px;
+            min-height: 20px;
+            margin-left: 105px;
         }
         QPushButton:!checked {
             background: #E5E5E5;
@@ -284,20 +285,22 @@ def _control_card(app):
 
     # 温度
     temp_frame = QtWidgets.QFrame()
-    temp_frame.setStyleSheet("QFrame { background:#F0F0F0; border-radius:8px; }")
+    temp_frame.setStyleSheet("QFrame { background:transparent; }")
     temp_frame.setMinimumWidth(250)
     temp_frame.setFixedHeight(32)
-    tfl = QtWidgets.QHBoxLayout(temp_frame); tfl.setContentsMargins(4, 0, 4, 0); tfl.setSpacing(0)
-    b = QtWidgets.QPushButton("−"); b.setFixedWidth(28); b.clicked.connect(app._temp_down)
-    b.setStyleSheet("QPushButton { border:none; background:transparent; font-size:16px; font-weight:bold; padding:0; }")
+    tfl = QtWidgets.QHBoxLayout(temp_frame); tfl.setContentsMargins(0, 0, 0, 0); tfl.setSpacing(0)
+    b = QtWidgets.QPushButton("−"); b.setFixedSize(38, 32); b.clicked.connect(app._temp_down)
+    b.setCursor(QtCore.Qt.PointingHandCursor)
+    b.setStyleSheet("QPushButton { border:none; background:#F0F0F0; border-radius:8px; font-size:16px; font-weight:bold; } QPushButton:hover { background:#DEE4EA; }")
     tfl.addWidget(b)
     tfl.addStretch()
     app._temp_lbl = lbl("26°C", size=14, bold=False, color="#2F80ED")
     app._temp_lbl.setAlignment(QtCore.Qt.AlignCenter); app._temp_lbl.setFixedWidth(50)
     tfl.addWidget(app._temp_lbl)
     tfl.addStretch()
-    b = QtWidgets.QPushButton("+"); b.setFixedWidth(28); b.clicked.connect(app._temp_up)
-    b.setStyleSheet("QPushButton { border:none; background:transparent; font-size:16px; font-weight:bold; padding:0; }")
+    b = QtWidgets.QPushButton("+"); b.setFixedSize(38, 32); b.clicked.connect(app._temp_up)
+    b.setCursor(QtCore.Qt.PointingHandCursor)
+    b.setStyleSheet("QPushButton { border:none; background:#F0F0F0; border-radius:8px; font-size:16px; font-weight:bold; } QPushButton:hover { background:#DEE4EA; }")
     tfl.addWidget(b)
     _ctrl_row("温度", temp_frame)
 

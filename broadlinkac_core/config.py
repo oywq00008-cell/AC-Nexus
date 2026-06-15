@@ -223,6 +223,42 @@ def _migrate_old_config():
         old_cache.unlink()
 
 
+def search_city(name):
+    """城市搜索（单条）— 返回 (lat, lon, 显示名) 或 (None, None, '')。保留以兼容旧调用。"""
+    results = search_cities(name)
+    if results:
+        return results[0]
+    return None, None, ""
+
+
+def search_cities(name):
+    """城市搜索（多条）— 返回 [(lat, lon, 显示名, 省, 归一化层级), ...] 或 []"""
+    import urllib.request, json, re
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(name)}&format=json&limit=8&accept-language=zh&addressdetails=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC"})
+        resp = urllib.request.urlopen(req, timeout=8)
+        data = json.loads(resp.read())
+        results = []
+        for item in data:
+            lat = float(item["lat"])
+            lon = float(item["lon"])
+            # 用 display_name 展示（只去掉邮编，其余保留 Nominatim 本来的顺序）
+            raw = item.get("display_name", "")
+            normalized = re.sub(r",\s*\d{6}", "", raw)       # 去邮编 "518000"
+            normalized = re.sub(r"\s{2,}", " ", normalized.strip())  # 合并多余空格
+            # 省/国从 address 取（用于保存到 config）
+            addr = item.get("address", {})
+            province = addr.get("state") or addr.get("province") or ""
+            nation = addr.get("country", "")
+            results.append((lat, lon, normalized.split(",")[0].strip(),
+                           province, nation, normalized))
+        return results
+    except Exception:
+        pass
+    return []
+
+
 def init(api_key=None, qw_host=None, location=None, brand=None):
     """初始化：加载配置、迁移旧版、同步全局变量、启动调度"""
     global config

@@ -3,6 +3,8 @@
 import os, sys, subprocess, json, urllib.request, threading
 
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtSvgWidgets import QSvgWidget
+from PySide6 import QtSvg
 
 import broadlinkac_core.config as _cfg
 from broadlinkac_core.config import save_config, apply_config, AC_BRANDS, LOG_DIR
@@ -212,8 +214,96 @@ def _dialog_content(dlg, title="", title_size=13, frameless=False):
 
 
 # ── 设置对话框 ──
+def _do_learn_wizard(settings_dlg, cb):
+    """模块级函数：从设置弹窗中启动学习向导"""
+    from .learn_dialog import NewRemoteDialog, LearnWizard
+    from broadlinkac_core.ir_learner import list_custom
+
+    new_dlg = NewRemoteDialog(settings_dlg)
+    result = new_dlg.exec()
+    if not result:
+        return
+
+    saved_name = result["name"]
+    while True:
+        wizard = LearnWizard(settings_dlg, result["name"], result["logo"], result["steps"])
+        if not wizard.exec():
+            break
+        # 继续学习：用编辑模式打开，加载已有组合
+        from broadlinkac_core.ir_learner import load_custom_codes
+        existing = load_custom_codes().get(result["name"], {})
+        new_dlg = NewRemoteDialog(settings_dlg, edit_mode=True,
+                                   edit_name=result["name"],
+                                   edit_logo=result["logo"],
+                                   edit_codes=existing.get("codes", {}))
+        result = new_dlg.exec()
+        if not result or "steps" not in result:
+            break
+
+    customs = list_custom()
+    for i in range(cb.count() - 1, -1, -1):
+        if cb.itemText(i).startswith("🛠 "):
+            cb.removeItem(i)
+    for c in customs:
+        cb.addItem(f"🛠 {c}")
+    idx = cb.findText(f"🛠 {saved_name}")
+    if idx >= 0:
+        cb.setCurrentIndex(idx)
+
+
+def _do_edit_custom(settings_dlg, cb, name, entry):
+    """编辑已有自定义遥控器"""
+    from .learn_dialog import NewRemoteDialog, LearnWizard, LOGO_LIST
+    from broadlinkac_core.ir_learner import load_custom_codes, save_learned_codes, save_custom_codes, list_custom
+
+    # 打开编辑窗口（加载已有数据）
+    edit_dlg = NewRemoteDialog(settings_dlg, edit_mode=True, edit_name=name, edit_logo=entry.get("logo", ""), edit_codes=entry.get("codes", {}))
+    result = edit_dlg.exec()
+    if not result:
+        return
+
+    # result = {"name": ..., "logo": ..., "new_combos": [...], "deleted_combos": [...]}
+    new_name = result["name"]
+    new_logo = result["logo"]
+
+    # 先删除已移除的组合
+    codes = entry.get("codes", {}).copy()
+    for dk in result.get("deleted_combos", []):
+        codes.pop(dk, None)
+    # 直接覆盖保存（不合并，确保删除生效）
+    all_codes = load_custom_codes()
+    all_codes[new_name] = {"logo": new_logo, "learned_at": entry.get("learned_at", ""), "codes": codes}
+    if new_name != name:
+        all_codes.pop(name, None)
+    save_custom_codes(all_codes)
+
+    # 如果有新增组合，弹出学习向导（_finish 内部会 merge 到现有码）
+    if result.get("new_combos"):
+        steps = [("关机", "请先打开遥控器，然后对准博联设备按遥控器的【关机】键")]
+        for combo in result["new_combos"]:
+            parts = combo.replace("开机_", "").replace("°C", "").split("_")
+            if len(parts) >= 3:
+                m, t, f = parts[0], parts[1], parts[2]
+                steps.append((combo, f"请在遥控器上设为：模式【{m}】、温度【{t}°C】、风速【{f}】。\n设好后关掉遥控器，对准博联设备按【开机】"))
+        wizard = LearnWizard(settings_dlg, new_name, new_logo, steps)
+        wizard.exec()
+
+    # 刷新下拉框
+    customs = list_custom()
+    for i in range(cb.count() - 1, -1, -1):
+        if cb.itemText(i).startswith("🛠 "):
+            cb.removeItem(i)
+    for c in customs:
+        cb.addItem(f"🛠 {c}")
+    idx = cb.findText(f"🛠 {new_name}")
+    if idx >= 0:
+        cb.setCurrentIndex(idx)
+
+
 def open_settings(app):
     dlg = QtWidgets.QDialog(app, QtCore.Qt.FramelessWindowHint if sys.platform == "win32" else QtCore.Qt.Dialog)
+    # 继承主窗口的 QPalette (Fusion 焦点框颜色 = Highlight 色)
+    dlg.setPalette(app.palette())
     if sys.platform == "win32":
         dlg.setAttribute(QtCore.Qt.WA_TranslucentBackground)
     dlg.resize(500, 680)
@@ -242,6 +332,12 @@ def open_settings(app):
         title_bar.setStyleSheet(f"background: transparent; border-bottom: 1px solid {title_bd};")
         tbl = QtWidgets.QHBoxLayout(title_bar)
         tbl.setContentsMargins(16, 0, 8, 0)
+        gear_svg = os.path.join(os.path.dirname(__file__), "..", "..", "icons", "settings_black.svg")
+        gear_px = QtGui.QPixmap(22, 22); gear_px.fill(QtCore.Qt.transparent)
+        QtSvg.QSvgRenderer(gear_svg).render(QtGui.QPainter(gear_px))
+        gear_btn = QtWidgets.QToolButton(); gear_btn.setIcon(QtGui.QIcon(gear_px)); gear_btn.setIconSize(QtCore.QSize(22, 22))
+        gear_btn.setStyleSheet("QToolButton { border:none; background:transparent; margin-top:1px; }"); gear_btn.setEnabled(False)
+        tbl.addWidget(gear_btn)
         tbl.addWidget(lbl("设置", bold=True, size=14))
         tbl.addStretch()
         close_btn = QtWidgets.QPushButton("✕")
@@ -263,7 +359,9 @@ def open_settings(app):
         layout.setContentsMargins(12, 12, 12, 12)
         scroll = QtWidgets.QScrollArea(); scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border:none; background:transparent; }")
-        sw = QtWidgets.QWidget(); swl = QtWidgets.QVBoxLayout(sw); scroll.setWidget(sw); layout.addWidget(scroll)
+        sw = QtWidgets.QWidget()
+        sw.setStyleSheet("background: white;")
+        swl = QtWidgets.QVBoxLayout(sw); scroll.setWidget(sw); layout.addWidget(scroll)
         ov.addLayout(layout)
 
         full = QtWidgets.QVBoxLayout(dlg)
@@ -279,185 +377,355 @@ def open_settings(app):
         title_bar = None
         close_btn = None
 
-    # ── 天气 API ──
-    f1 = frm(); fl = QtWidgets.QVBoxLayout(f1); fl.setContentsMargins(10, 8, 10, 8)
-    fl.addWidget(lbl("天气 API", bold=True, size=13), alignment=QtCore.Qt.AlignCenter)
-    pr = QtWidgets.QWidget(); prl = QtWidgets.QHBoxLayout(pr); prl.setContentsMargins(0, 0, 0, 0)
-    prl.addWidget(QtWidgets.QLabel("数据源:"))
-    provider_cb = QtWidgets.QComboBox()
-    provider_cb.addItems(["百度天气", "和风天气"])
-    provider_cb.setCurrentText("百度天气" if _cfg.config.get("weather_provider", "baidu") == "baidu" else "和风天气")
-    prl.addWidget(provider_cb); prl.addStretch(); fl.addWidget(pr)
+    # ══════════════════════════════════════════
+    # 卡片布局：左侧 1/5 图标区 + 右侧 4/5 内容区
+    # ══════════════════════════════════════════
 
-    # 百度输入区
-    bd_frame = QtWidgets.QWidget(); bdl = QtWidgets.QVBoxLayout(bd_frame); bdl.setContentsMargins(0, 0, 0, 0)
-    bd_entry = QtWidgets.QLineEdit(_cfg.config.get("baidu_key", ""))
-    bd_entry.setPlaceholderText("百度 API Key"); bd_entry.setEchoMode(QtWidgets.QLineEdit.Password)
-    bdl.addWidget(bd_entry)
-    bdl.addWidget(lbl("💡 每天 5,000 次调用", color="gray"))
-    fl.addWidget(bd_frame)
+    def _make_card(icon_path, title):
+        from ._utils import is_dark
+        dark = is_dark()
+        card_bg = "#2D2D2D" if dark else "white"
+        card_bd = "#444" if dark else "#E5E7EB"
+        side_bg = "#1E2D3D" if dark else "#EDF8FF"
+        title_color = "#5B9BD5" if dark else "#1AA6FF"
+        card = QtWidgets.QFrame()
+        card.setObjectName("settings_card")
+        card.setStyleSheet(f"QFrame#settings_card {{ background:{card_bg}; border:1px solid {card_bd}; border-radius:12px; }}")
+        cl = QtWidgets.QHBoxLayout(card); cl.setContentsMargins(0, 0, 0, 0); cl.setSpacing(0)
+        side = QtWidgets.QWidget()
+        side.setFixedWidth(100)
+        side.setStyleSheet(f"background:{side_bg}; border-top-left-radius:12px; border-bottom-left-radius:12px;")
+        sl = QtWidgets.QVBoxLayout(side); sl.setAlignment(QtCore.Qt.AlignCenter)
+        sl.setContentsMargins(8, 12, 8, 12)
+        svg = QSvgWidget(icon_path)
+        svg.setFixedSize(40, 40)
+        sl.addWidget(svg, alignment=QtCore.Qt.AlignCenter)
+        tl = lbl(title, bold=True, size=11, color=title_color)
+        sl.addWidget(tl, alignment=QtCore.Qt.AlignCenter)
+        cl.addWidget(side)
+        right = QtWidgets.QWidget()
+        rl = QtWidgets.QVBoxLayout(right); rl.setContentsMargins(12, 10, 12, 10)
+        cl.addWidget(right, 1)
+        return card, rl
 
-    # 和风输入区
-    qw_frame = QtWidgets.QWidget(); qwl = QtWidgets.QVBoxLayout(qw_frame); qwl.setContentsMargins(0, 0, 0, 0)
-    qw_key = QtWidgets.QLineEdit(_cfg.QW_KEY)
-    qw_key.setPlaceholderText("和风 API Key"); qw_key.setEchoMode(QtWidgets.QLineEdit.Password)
-    qwl.addWidget(qw_key)
-    qw_host = QtWidgets.QLineEdit(_cfg.QW_HOST)
-    qw_host.setPlaceholderText("https://xxx.re.qweatherapi.com")
-    qwl.addWidget(qw_host)
-    qwl.addWidget(lbl("💡 免费订阅需填入个人 Host 地址", color="gray"))
-    fl.addWidget(qw_frame)
+    icons_dir = os.path.join(os.path.dirname(__file__), "..", "..", "icons")
 
-    if "和风" in provider_cb.currentText():
-        bd_frame.hide()
-    else:
-        qw_frame.hide()
+    # ── 1. 基础设置 ──
+    card1, c1l = _make_card(os.path.join(icons_dir, "settings.svg"), "基础设置")
 
-    def on_provider_change(txt):
-        if "和风" in txt:
-            bd_frame.hide(); qw_frame.show()
-        else:
-            qw_frame.hide(); bd_frame.show()
-    provider_cb.currentTextChanged.connect(on_provider_change)
-    swl.addWidget(f1)
-
-    # ── 基础设置 ──
-    f2 = frm(); f2l = QtWidgets.QVBoxLayout(f2); f2l.setContentsMargins(10, 8, 10, 8)
-    f2l.addWidget(lbl("基础设置", bold=True, size=13), alignment=QtCore.Qt.AlignCenter)
-
-    # 主题
+    from broadlinkac_core.autostart import is_enabled, enable, disable
     r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0)
-    rl.addWidget(QtWidgets.QLabel("主题:"))
-    rl.addStretch(1)
-    theme_cb = QtWidgets.QComboBox(); theme_cb.addItems(["跟随系统", "浅色", "深色"])
-    theme_cb.setMinimumWidth(180); theme_cb.setMaximumWidth(180)
+    rl.addWidget(QtWidgets.QLabel("开机自启:")); rl.addStretch(1)
+    autostart_cb = QtWidgets.QComboBox(); autostart_cb.addItems(["关", "开"])
+    autostart_cb.setCurrentText("开" if is_enabled() else "关")
+    autostart_cb.setMinimumWidth(140); autostart_cb.setMaximumWidth(140)
+    autostart_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
+    autostart_cb.setEditable(True); autostart_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); autostart_cb.lineEdit().setReadOnly(True)
+    def toggle_autostart(txt):
+        script = os.path.join(os.path.dirname(__file__), "..", "ac_controller_pyside6.py")
+        if txt == "开": enable(script)
+        else: disable()
+    autostart_cb.currentTextChanged.connect(toggle_autostart)
+    rl.addWidget(autostart_cb, alignment=QtCore.Qt.AlignRight); c1l.addWidget(r)
+
+    r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0)
+    rl.addWidget(QtWidgets.QLabel("主题:")); rl.addStretch(1)
+    theme_cb = QtWidgets.QComboBox()
+    theme_cb.setMinimumWidth(140); theme_cb.setMaximumWidth(140)
     theme_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
-    rl.addWidget(theme_cb); f2l.addWidget(r)
+    theme_cb.setEditable(True); theme_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); theme_cb.lineEdit().setReadOnly(True)
+    rl.addWidget(theme_cb, alignment=QtCore.Qt.AlignRight); c1l.addWidget(r)
     mode_map = {"system": "跟随系统", "light": "浅色", "dark": "深色"}
     cur_mode = _cfg.config.get("appearance_mode", "system")
-    theme_cb.setCurrentText(mode_map.get(cur_mode, "跟随系统"))
+    with QtCore.QSignalBlocker(theme_cb):
+        theme_cb.addItems(["跟随系统", "浅色", "深色"])
+        theme_cb.setCurrentText(mode_map.get(cur_mode, "跟随系统"))
     def _refresh_settings_theme(dark):
         """刷新设置窗口自身的主题"""
-        if sys.platform != "win32":
-            return  # macOS/Linux 用原生窗口，不需要刷新
+        if sys.platform != "win32": return
         outer.setStyleSheet(f"QFrame#settings_outer {{ background:{'#2D2D2D' if dark else 'white'}; border:1px solid {'#444' if dark else '#DEDEDE'}; border-radius:12px; }}")
         title_bar.setStyleSheet(f"background: transparent; border-bottom: 1px solid {'#444' if dark else '#E5E7EB'};")
         close_btn.setStyleSheet(f"QPushButton {{ font-size:14px; color:{'#AAA' if dark else '#888'}; border:none; background:transparent; }} QPushButton:hover {{ background:{'#444' if dark else '#F0F0F0'}; border-radius:4px; }}")
         scroll.setStyleSheet(f"QScrollArea {{ border:none; background:{'#2D2D2D' if dark else 'white'}; }}")
         sw.setStyleSheet(f"background: {'#2D2D2D' if dark else 'white'};")
-
+        # 卡片标头
+        for card in dlg.findChildren(QtWidgets.QFrame):
+            if card.objectName() == "settings_card":
+                card.setStyleSheet(f"QFrame#settings_card {{ background:{'#2D2D2D' if dark else 'white'}; border:1px solid {'#444' if dark else '#E5E7EB'}; border-radius:12px; }}")
+        # 侧栏
+        for side in dlg.findChildren(QtWidgets.QWidget):
+            s = side.styleSheet()
+            if "border-top-left-radius:12px" in s and "border-bottom-left-radius:12px" in s:
+                side.setStyleSheet(f"background:{'#1E2D3D' if dark else '#EDF8FF'}; border-top-left-radius:12px; border-bottom-left-radius:12px;")
+        # 城市搜索输入框
+        for inp in dlg.findChildren(QtWidgets.QLineEdit):
+            if inp.objectName() == "city_search_input":
+                inp.setStyleSheet(f"QLineEdit {{ color:{'#EEE' if dark else '#333'}; background:{'#3D3D3D' if dark else 'white'}; border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:6px; padding:4px 8px; }}")
+        # 取消 / 保存按钮（只改颜色，不改尺寸）
+        for btn in dlg.findChildren(QtWidgets.QPushButton):
+            if btn.objectName() == "settings_cancel_btn":
+                btn.setStyleSheet(f"QPushButton#settings_cancel_btn {{ background:{'#555' if dark else 'white'}; color:{'#DDD' if dark else '#333'}; border:1px solid {'#666' if dark else '#DEDEDE'}; border-radius:8px; font-size:13px; }} QPushButton#settings_cancel_btn:hover {{ background:{'#666' if dark else '#F5F5F5'}; }}")
+            elif btn.objectName() == "settings_save_btn":
+                btn.setStyleSheet(f"QPushButton#settings_save_btn {{ background:{'#0076D4' if not dark else '#2F80ED'}; color:white; border:1px solid {'#0076D4' if not dark else '#2F80ED'}; border-radius:8px; font-size:13px; font-weight:500; }} QPushButton#settings_save_btn:hover {{ background:{'#0065B8' if not dark else '#1A6FD8'}; }}")
     def on_theme_change(t):
         mode = {v: k for k, v in mode_map.items()}.get(t, "system")
         apply_theme(mode)
         d = mode == "dark" or (mode == "system" and _is_system_dark())
         _refresh_settings_theme(d)
-
+        _cfg.config["appearance_mode"] = mode
+        save_config(_cfg.config, sync_device=False)
     theme_cb.currentTextChanged.connect(on_theme_change)
-    rl.addWidget(theme_cb); rl.addStretch(); f2l.addWidget(r)
 
-    # 品牌
     r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0)
-    rl.addWidget(QtWidgets.QLabel("空调品牌:"))
-    rl.addStretch(1)
+    rl.addWidget(QtWidgets.QLabel("空调遥控器:")); rl.addStretch(1)
     brand_cb = QtWidgets.QComboBox(); brand_cb.addItems(list(AC_BRANDS.keys()))
-    brand_cb.setCurrentText(_cfg.config.get("brand", "格力"))
-    brand_cb.setMinimumWidth(180); brand_cb.setMaximumWidth(180)
+    from broadlinkac_core.ir_learner import list_custom
+    customs = list_custom()
+    for c in customs:
+        brand_cb.addItem("🛠 " + c)
+    cur_brand = _cfg.config.get("brand", "格力")
+    idx = brand_cb.findText("🛠 " + cur_brand)
+    if idx >= 0: brand_cb.setCurrentIndex(idx)
+    else: brand_cb.setCurrentText(cur_brand)
+    brand_cb.setMinimumWidth(140); brand_cb.setMaximumWidth(140)
     brand_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
-    rl.addWidget(brand_cb, alignment=QtCore.Qt.AlignRight); f2l.addWidget(r)
-    swl.addWidget(f2)
+    brand_cb.setEditable(True); brand_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); brand_cb.lineEdit().setReadOnly(True)
+    rl.addWidget(brand_cb, alignment=QtCore.Qt.AlignRight); c1l.addWidget(r)
 
-    # ── 城市设置 ──
-    f3 = frm(); f3l = QtWidgets.QVBoxLayout(f3); f3l.setContentsMargins(10, 8, 10, 8)
-    f3l.addWidget(lbl("城市设置", bold=True, size=13), alignment=QtCore.Qt.AlignCenter)
+    r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0)
+    rl.addStretch(1)
+    def _make_icon_btn(svg_path, qss, tooltip, size=28):
+        px = QtGui.QPixmap(size-8, size-8); px.fill(QtCore.Qt.transparent)
+        QtSvg.QSvgRenderer(svg_path).render(QtGui.QPainter(px))
+        btn = QtWidgets.QToolButton(); btn.setIcon(QtGui.QIcon(px)); btn.setIconSize(QtCore.QSize(size-8, size-8))
+        btn.setFixedSize(size, size); btn.setStyleSheet(qss); btn.setToolTip(tooltip)
+        btn.setCursor(QtCore.Qt.PointingHandCursor)
+        return btn
 
-    loc_info = QtWidgets.QLabel(
-        f"当前: {_cfg.LOCATION['name']} ({_cfg.LOCATION['lat']}°N, {_cfg.LOCATION['lon']}°E)")
-    loc_info.setStyleSheet("color:#27AE60;")
-    f3l.addWidget(loc_info, alignment=QtCore.Qt.AlignCenter)
+    del_btn = _make_icon_btn(os.path.join(icons_dir, "delete_red.svg"),
+        "QToolButton { border:1px solid #E74C3C; border-radius:4px; } QToolButton:hover { background:#FDE8E8; }",
+        "删除当前自定义品牌")
+    def _delete_custom():
+        name = brand_cb.currentText()
+        if not name.startswith("🛠 "): return
+        name = name[2:]
+        if QtWidgets.QMessageBox.question(dlg, "确认删除", "确定要删除 '" + name + "' 及其所有学习码吗？",
+                                          QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No) != QtWidgets.QMessageBox.Yes:
+            return
+        from broadlinkac_core.ir_learner import load_custom_codes, save_custom_codes
+        codes = load_custom_codes(); codes.pop(name, None); save_custom_codes(codes)
+        for i in range(brand_cb.count() - 1, -1, -1):
+            if brand_cb.itemText(i).startswith("🛠 "): brand_cb.removeItem(i)
+        from broadlinkac_core.ir_learner import list_custom
+        for c in list_custom(): brand_cb.addItem("🛠 " + c)
+        brand_cb.setCurrentText("格力"); del_btn.setVisible(False); edit_btn.setVisible(False)
+    del_btn.clicked.connect(_delete_custom); rl.addWidget(del_btn)
 
-    dl = dlg  # capture reference
+    edit_btn = _make_icon_btn(os.path.join(icons_dir, "edit_blue.svg"),
+        "QToolButton { border:1px solid #2F80ED; border-radius:4px; } QToolButton:hover { background:#E8F0FE; }",
+        "编辑当前自定义遥控器")
+    def _edit_custom():
+        name = brand_cb.currentText()
+        if not name.startswith("🛠 "): return
+        name = name[2:]
+        from broadlinkac_core.ir_learner import load_custom_codes
+        all_codes = load_custom_codes()
+        entry = all_codes.get(name)
+        if not entry: return
+        _do_edit_custom(dlg, brand_cb, name, entry)
+    edit_btn.clicked.connect(_edit_custom); rl.addWidget(edit_btn)
+    brand_cb.currentIndexChanged.connect(lambda: [del_btn.setVisible(brand_cb.currentText().startswith("🛠 ")), edit_btn.setVisible(brand_cb.currentText().startswith("🛠 "))])
+    is_custom = brand_cb.currentText().startswith("🛠 "); del_btn.setVisible(is_custom); edit_btn.setVisible(is_custom)
 
+    learn_btn = _make_icon_btn(os.path.join(icons_dir, "add.svg"),
+        "QToolButton { border:1px solid #2F80ED; border-radius:4px; } QToolButton:hover { background:#E8F0FE; }",
+        "新增自定义遥控器")
+    learn_btn.clicked.connect(lambda: _do_learn_wizard(dlg, brand_cb))
+    rl.addWidget(learn_btn); c1l.addWidget(r)
+    swl.addWidget(card1)
+
+    # ── 2. 城市设置 ──
+    card2, c2l = _make_card(os.path.join(icons_dir, "location_blue.svg"), "城市设置")
+
+    loc_info = QtWidgets.QLabel("当前: " + _cfg.LOCATION['name'])
+    loc_info.setStyleSheet("color:#27AE60; font-size:13px;")
+    c2l.addWidget(loc_info, alignment=QtCore.Qt.AlignRight)
+
+    dl = dlg
     def auto_locate():
         loc_info.setText("⏳ 定位中..."); loc_info.setStyleSheet("color:#E67E22;")
         try:
-            resp = urllib.request.urlopen("http://ip-api.com/json/", timeout=5)
+            resp = urllib.request.urlopen("http://ip-api.com/json/?fields=lat,lon,city,regionName,status", timeout=8)
             data = json.loads(resp.read())
             if data.get("status") == "success":
-                dl._picked_loc = {
-                    "lat": data["lat"], "lon": data["lon"],
-                    "name": f"{data['city']}{data.get('regionName','')}"
-                }
-                loc_info.setText(f"当前: {dl._picked_loc['name']} ({data['lat']:.2f}°N, {data['lon']:.2f}°E)")
+                dl._picked_loc = {"lat": data["lat"], "lon": data["lon"], "name": data['city'] + data.get('regionName','')}
+                loc_info.setText("当前: " + dl._picked_loc['name'])
                 loc_info.setStyleSheet("color:#27AE60;")
-            else:
-                loc_info.setText("定位失败"); loc_info.setStyleSheet("color:#E74C3C;")
-        except Exception as e:
-            loc_info.setText(f"定位失败: {e}"); loc_info.setStyleSheet("color:#E74C3C;")
-
-    b = QtWidgets.QPushButton("📍 自动定位"); b.clicked.connect(lambda: threading.Thread(target=auto_locate, daemon=True).start())
-    f3l.addWidget(b)
-    f3l.addWidget(lbl("自动定位基于IP, 建议使用搜索", size=9, color="gray"), alignment=QtCore.Qt.AlignCenter)
+            else: loc_info.setText("定位失败"); loc_info.setStyleSheet("color:#E74C3C;")
+        except Exception as e: loc_info.setText("定位失败: " + str(e)); loc_info.setStyleSheet("color:#E74C3C;")
+    b = QtWidgets.QPushButton()
+    b.setIcon(QtGui.QIcon(os.path.join(icons_dir, "location.svg")))
+    b.setText(" 自动定位")
+    b.clicked.connect(lambda: threading.Thread(target=auto_locate, daemon=True).start())
+    c2l.addWidget(b)
+    c2l.addWidget(lbl("自动定位基于IP, 建议使用搜索", size=9, color="gray"), alignment=QtCore.Qt.AlignRight)
 
     sr = QtWidgets.QWidget(); srl = QtWidgets.QHBoxLayout(sr); srl.setContentsMargins(0, 0, 0, 0)
-    city_entry = QtWidgets.QLineEdit(); city_entry.setPlaceholderText("输入城市名搜索")
+    city_entry = QtWidgets.QLineEdit()
+    city_entry.setPlaceholderText("输入位置(如：翻斗花园)")
+    city_entry.setObjectName("city_search_input")
     srl.addWidget(city_entry)
+    dw = dlg
+    search_btn = QtWidgets.QPushButton("  🔍 搜索  ")
     def do_search():
-        q = city_entry.text().strip()
-        if not q: QtWidgets.QMessageBox.warning(dlg, "提示", "请输入城市名称"); return
-        results = city_lookup(q)
-        if not results: QtWidgets.QMessageBox.information(dlg, "未找到", f"未找到 '{q}'"); return
-        pd = QtWidgets.QDialog(dlg, QtCore.Qt.FramelessWindowHint if sys.platform == "win32" else QtCore.Qt.Dialog)
+        city = city_entry.text().strip()
+        if not city: return
+        search_btn.setText("⏳ 搜索中...")
+        QtCore.QTimer.singleShot(50, lambda: _do_search_thread(city))
+    def _reset_btn():
+        search_btn.setText("  🔍 搜索  ")
+    def _do_search_thread(city):
+        def _run():
+            try:
+                results = _cfg.search_cities(city)
+                app._ui(lambda: [_show_city_picker(results, city), _reset_btn()])
+            except Exception as e:
+                app._ui(lambda: [search_btn.setText("❌ 搜索失败"), QtCore.QTimer.singleShot(2000, _reset_btn)])
+        threading.Thread(target=_run, daemon=True).start()
+    def _apply_picked(lat, lon, dname):
+        dw._picked_loc = {"lat": lat, "lon": lon, "name": dname}
+        loc_info.setText("当前: " + dname)
+        loc_info.setStyleSheet("color:#27AE60;")
+    def _show_city_picker(results, city=""):
+        """弹出城市选择窗口 — 0条/1条/多条都弹窗，由用户手动选择"""
+        picker = QtWidgets.QDialog(dlg, QtCore.Qt.FramelessWindowHint if sys.platform == "win32" else QtCore.Qt.Dialog)
+        picker.setWindowModality(QtCore.Qt.WindowModal)
+        picker.setWindowTitle("选择城市")
+        picker.resize(300, 340)
         if sys.platform == "win32":
-            pd.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-            pd.setWindowTitle("选择城市")
-        pd.resize(500, 400)
-        pd.setWindowModality(QtCore.Qt.WindowModal)
-
-        if sys.platform == "win32":
-            p_outer = QtWidgets.QFrame(pd)
-            p_outer.setStyleSheet(f"QFrame {{ background:{outer_bg}; border:1px solid {outer_bd}; border-radius:12px; }}")
-            p_ov = QtWidgets.QVBoxLayout(p_outer)
-            p_ov.setContentsMargins(0, 0, 0, 0); p_ov.setSpacing(0)
-            p_title = QtWidgets.QWidget(); p_title.setFixedHeight(36)
-            p_title.setStyleSheet(f"background: transparent; border-bottom: 1px solid {title_bd};")
-            ptl = QtWidgets.QHBoxLayout(p_title); ptl.setContentsMargins(16, 0, 8, 0)
-            ptl.addWidget(lbl("选择城市", bold=True, size=10))
-            ptl.addStretch()
-            p_close = QtWidgets.QPushButton("✕"); p_close.setFixedSize(28, 28); p_close.setFlat(True)
-            p_close.setStyleSheet(close_btn.styleSheet())
-            p_close.clicked.connect(pd.reject); ptl.addWidget(p_close)
-            p_ov.addWidget(p_title)
-            pl = QtWidgets.QVBoxLayout(); pl.setContentsMargins(12, 8, 12, 12)
+            picker.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+            from ._utils import is_dark
+            dark = is_dark()
+            outer_bg = "#2D2D2D" if dark else "white"
+            outer_bd = "#444" if dark else "#DEDEDE"
+            outer = QtWidgets.QFrame(picker)
+            outer.setObjectName("picker_outer")
+            outer.setStyleSheet(f"QFrame#picker_outer {{ background:{outer_bg}; border:1px solid {outer_bd}; border-radius:12px; }}")
+            # 阴影
+            shadow = QtWidgets.QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(24)
+            shadow.setOffset(0, 4)
+            shadow.setColor(QtGui.QColor(0, 0, 0, 40))
+            outer.setGraphicsEffect(shadow)
+            ov = QtWidgets.QVBoxLayout(outer); ov.setContentsMargins(0, 0, 0, 0); ov.setSpacing(0)
+            tb = QtWidgets.QWidget(); tb.setFixedHeight(38)
+            tb.setStyleSheet(f"background: transparent; border-bottom: 1px solid {outer_bd}; QWidget {{ border:none; background:transparent; }}")
+            t_bl = QtWidgets.QHBoxLayout(tb); t_bl.setContentsMargins(14, 0, 8, 0)
+            title_text = "搜索结果 — 请选择你的城市" if results else f"未找到 \"{city}\" 的匹配结果"
+            loc_icon = QtWidgets.QLabel()
+            loc_icon_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", "location.svg")
+            loc_icon.setPixmap(QtGui.QIcon(loc_icon_path).pixmap(18, 18))
+            t_bl.addWidget(loc_icon)
+            t_bl.addWidget(lbl(title_text, bold=True, size=11))
+            t_bl.addStretch()
+            close_btn = QtWidgets.QPushButton("✕"); close_btn.setFixedSize(28, 28); close_btn.setFlat(True)
+            close_btn.setStyleSheet(f"QPushButton {{ font-size:14px; color:{'#AAA' if dark else '#888'}; border:none; background:transparent; }} QPushButton:hover {{ background:{'#444' if dark else '#F0F0F0'}; border-radius:4px; }}")
+            close_btn.clicked.connect(picker.reject); t_bl.addWidget(close_btn)
+            ov.addWidget(tb)
+            # 列表
+            lw = QtWidgets.QListWidget()
+            lw.setStyleSheet(f"QListWidget {{ border:none; font-size:13px; background:{outer_bg}; }} QListWidget::item {{ padding:8px 14px; }} QListWidget::item:selected {{ background:{'#3D3D3D' if dark else '#E8F0FE'}; color:{'#EEE' if dark else '#333'}; border-radius:6px; }} QListWidget::item:hover {{ background:{'#3D3D3D' if dark else '#F5F8FC'}; border-radius:6px; }}")
+            ov.addWidget(lw)
+            inner = QtWidgets.QWidget(); iv = QtWidgets.QVBoxLayout(inner); iv.setContentsMargins(10, 8, 10, 10)
+            ov.addWidget(inner)
         else:
-            pl = QtWidgets.QVBoxLayout(pd)
-            pl.setContentsMargins(12, 12, 12, 12)
-        pl.addWidget(lbl(f"搜索 '{q}' 找到 {len(results)} 个结果", size=12, color="gray"))
-        lw = QtWidgets.QListWidget()
-        lw.setStyleSheet("QListWidget { border:1px solid #DEDEDE; border-radius:6px; } QListWidget::item { padding:6px 8px; } QListWidget::item:selected { background:#E8F0FE; color:#2F80ED; }")
-        for r in results:
-            item = QtWidgets.QListWidgetItem(f"{r['name']}  {r['display']}")
-            item.setToolTip(f"{r['lat']:.4f}°N, {r['lon']:.4f}°E")
-            lw.addItem(item)
-        pl.addWidget(lw)
-        pb = QtWidgets.QWidget(); pbl = QtWidgets.QHBoxLayout(pb)
-        pbl.addStretch()
-        pbl.addWidget(QtWidgets.QPushButton("取消", clicked=pd.reject))
-        def pick():
-            idx = lw.currentRow()
-            if idx >= 0 and idx < len(results):
-                dl._picked_loc = results[idx]
-                loc_info.setText(f"当前: {results[idx]['name']} ({results[idx]['lat']:.2f}°N, {results[idx]['lon']:.2f}°E)")
-                loc_info.setStyleSheet("color:#27AE60;")
-            pd.accept()
-        pb_pick = QtWidgets.QPushButton("确认", clicked=pick); pbl.addWidget(pb_pick)
-        pl.addWidget(pb)
+            inner = picker; iv = QtWidgets.QVBoxLayout(inner)
+            iv.setContentsMargins(14, 14, 14, 14)
+            lw = QtWidgets.QListWidget()
+            lw.setStyleSheet("QListWidget {{ border:1px solid #DEDEDE; border-radius:8px; font-size:13px; }} QListWidget::item {{ padding:8px 14px; border-bottom:1px solid #F0F0F0; }}")
+            iv.addWidget(lw)
+        if results:
+            for lat, lon, dname, province, nation, context in results:
+                # 上下文展示：省 / 国（或用完整层级）
+                region_str = context if context else (" / ".join(p for p in (province, nation) if p))
+                display = f"{dname} — {region_str}" if region_str else dname
+                item = QtWidgets.QListWidgetItem(display)
+                item.setData(QtCore.Qt.UserRole, (lat, lon, dname))
+                item.setToolTip(f"{region_str}\n经纬度: {lat:.4f}, {lon:.4f}" if region_str else f"经纬度: {lat:.4f}, {lon:.4f}")
+                lw.addItem(item)
+            lw.setCurrentRow(0)
+        else:
+            # 空结果提示
+            empty_item = QtWidgets.QListWidgetItem("没有匹配结果，请尝试更具体的名称（如 广州天河 或 北京朝阳）")
+            empty_item.setFlags(QtCore.Qt.NoItemFlags)
+            empty_item.setForeground(QtGui.QColor("#999"))
+            lw.addItem(empty_item)
+        # 按钮
+        btns = QtWidgets.QWidget(); bl = QtWidgets.QHBoxLayout(btns)
+        bl.addStretch()
+        bl.addWidget(QtWidgets.QPushButton("取消", clicked=picker.reject))
+        if results:
+            def _confirm():
+                item = lw.currentItem()
+                if item and item.flags() & QtCore.Qt.ItemIsSelectable:
+                    lat, lon, dname = item.data(QtCore.Qt.UserRole)
+                    _apply_picked(lat, lon, dname)
+                    picker.accept()
+            ok_btn = QtWidgets.QPushButton("✓ 确定")
+            ok_btn.setStyleSheet("QPushButton { background:#2F80ED; color:white; border:none; border-radius:6px; padding:6px 18px; font-weight:bold; } QPushButton:hover { background:#1A6FD8; }")
+            ok_btn.clicked.connect(_confirm); bl.addWidget(ok_btn)
+            # 双击也确认
+            lw.itemDoubleClicked.connect(_confirm)
+        iv.addWidget(btns)
         if sys.platform == "win32":
-            p_ov.addLayout(pl)
-            p_full = QtWidgets.QVBoxLayout(pd); p_full.setContentsMargins(0, 0, 0, 0); p_full.addWidget(p_outer)
-        pd.exec()
-    b = QtWidgets.QPushButton("🔍 搜索"); b.clicked.connect(do_search); srl.addWidget(b)
-    f3l.addWidget(sr)
-    swl.addWidget(f3)
+            full = QtWidgets.QVBoxLayout(picker); full.setContentsMargins(0, 0, 0, 0); full.addWidget(outer)
+        # 按最长文字自适应宽度
+        fm_title = QtGui.QFontMetrics(lbl(title_text, bold=True, size=11).font())
+        fm_item = lw.fontMetrics()
+        max_w = fm_title.horizontalAdvance(title_text) + 90  # 图标+关闭按钮+边距
+        for i in range(lw.count()):
+            w = fm_item.horizontalAdvance(lw.item(i).text()) + 50  # 列表项内边距
+            if w > max_w: max_w = w
+        max_w = max(min(max_w, 600), 280)
+        picker.resize(max_w, picker.height())
+        picker.exec()
+    search_btn.clicked.connect(do_search); srl.addWidget(search_btn)
+    c2l.addWidget(sr)
+    swl.addWidget(card2)
+
+    # ── 3. 天气 API ──
+    card3, c3l = _make_card(os.path.join(icons_dir, "weather", "cloudy_blue.svg"), "天气 API")
+
+    pr = QtWidgets.QWidget(); prl = QtWidgets.QHBoxLayout(pr); prl.setContentsMargins(0, 0, 0, 0)
+    prl.addStretch()
+    prl.addWidget(QtWidgets.QLabel("数据源:"))
+    provider_cb = QtWidgets.QComboBox()
+    provider_cb.addItems(["百度天气", "和风天气"])
+    provider_cb.setCurrentText("百度天气" if _cfg.config.get("weather_provider", "baidu") == "baidu" else "和风天气")
+    provider_cb.setMinimumWidth(140); provider_cb.setMaximumWidth(140)
+    provider_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
+    provider_cb.setEditable(True); provider_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); provider_cb.lineEdit().setReadOnly(True)
+    prl.addWidget(provider_cb); prl.addStretch(); c3l.addWidget(pr)
+
+    bd_frame = QtWidgets.QWidget(); bdl = QtWidgets.QVBoxLayout(bd_frame); bdl.setContentsMargins(0, 0, 0, 0)
+    bd_entry = QtWidgets.QLineEdit(_cfg.config.get("baidu_key", ""))
+    bd_entry.setPlaceholderText("百度 API Key"); bd_entry.setEchoMode(QtWidgets.QLineEdit.Password)
+    bdl.addWidget(bd_entry); bdl.addWidget(lbl("每天 5,000 次调用", color="gray"), alignment=QtCore.Qt.AlignCenter); c3l.addWidget(bd_frame)
+
+    qw_frame = QtWidgets.QWidget(); qwl = QtWidgets.QVBoxLayout(qw_frame); qwl.setContentsMargins(0, 0, 0, 0)
+    qw_key = QtWidgets.QLineEdit(_cfg.QW_KEY)
+    qw_key.setPlaceholderText("和风 API Key"); qw_key.setEchoMode(QtWidgets.QLineEdit.Password); qwl.addWidget(qw_key)
+    qw_host = QtWidgets.QLineEdit(_cfg.QW_HOST)
+    qw_host.setPlaceholderText("https://xxx.re.qweatherapi.com"); qwl.addWidget(qw_host)
+    qwl.addWidget(lbl("免费订阅需填入个人 Host 地址", color="gray"), alignment=QtCore.Qt.AlignCenter); c3l.addWidget(qw_frame)
+
+    if "和风" in provider_cb.currentText(): bd_frame.hide()
+    else: qw_frame.hide()
+    def on_provider_change(txt):
+        if "和风" in txt: bd_frame.hide(); qw_frame.show()
+        else: qw_frame.hide(); bd_frame.show()
+    provider_cb.currentTextChanged.connect(on_provider_change)
+    swl.addWidget(card3)
 
     # ── 保存 ──
     def save():
@@ -467,12 +735,15 @@ def open_settings(app):
         _cfg.config["qw_host"] = qw_host.text().strip()
         _cfg.config.pop("qweather_key", None)
         _cfg.config.pop("qweather_host", None)
-        _cfg.config["brand"] = brand_cb.currentText()
+        raw_brand = brand_cb.currentText()
+        if raw_brand.startswith("🛠 "):
+            raw_brand = raw_brand[2:]  # "🛠 " = 2 chars
+        _cfg.config["brand"] = raw_brand
         _cfg.config["appearance_mode"] = {v: k for k, v in mode_map.items()}.get(theme_cb.currentText(), "system")
         if hasattr(dl, "_picked_loc"):
             _cfg.config["location"] = dl._picked_loc
         save_config(_cfg.config); apply_config()
-        app._ctrl_title.setText(f"{_cfg.config.get('brand','格力')}空调控制")
+        app._ctrl_title.setText(f"{raw_brand}空调控制")
         from .ac_tab import update_brand_logo; update_brand_logo(app)
         app._wx_title.setText("当前天气")
         app._update_alert_source()
@@ -482,8 +753,28 @@ def open_settings(app):
         dlg.accept()
 
     btns = QtWidgets.QWidget(); bl = QtWidgets.QHBoxLayout(btns)
-    bl.addStretch(); bl.addWidget(QtWidgets.QPushButton("取消", clicked=dlg.reject))
-    bl.addWidget(QtWidgets.QPushButton("💾 保存", clicked=save)); layout.addWidget(btns)
+    bl.addStretch()
+    cancel_btn = QtWidgets.QPushButton("取消")
+    cancel_btn.setFixedSize(100, 30)
+    cancel_btn.setObjectName("settings_cancel_btn")
+    cancel_btn.setCursor(QtCore.Qt.PointingHandCursor)
+    cancel_btn.setStyleSheet("QPushButton#settings_cancel_btn { background:white; color:#333; border:1px solid #DEDEDE; border-radius:8px; font-size:13px; } QPushButton#settings_cancel_btn:hover { background:#F5F5F5; }")
+    cancel_btn.clicked.connect(lambda: dlg.close())
+    bl.addWidget(cancel_btn)
+    save_btn = QtWidgets.QPushButton()
+    save_btn.setObjectName("settings_save_btn")
+    save_btn.setIcon(QtGui.QIcon(os.path.join(icons_dir, "save_white.svg")))
+    save_btn.setText("保存")
+    save_btn.setIconSize(QtCore.QSize(16, 16))
+    save_btn.setFixedSize(100, 30)
+    save_btn.setCursor(QtCore.Qt.PointingHandCursor)
+    save_btn.setStyleSheet("QPushButton#settings_save_btn { background:#0076D4; color:white; border:1px solid #0076D4; border-radius:8px; font-size:13px; font-weight:500; } QPushButton#settings_save_btn:hover { background:#0065B8; }")
+    save_btn.clicked.connect(save); bl.addWidget(save_btn)
+    layout.addWidget(btns)
+
+    # 初始化深色/浅色适配（必须在所有 widget 创建之后）
+    from ._utils import is_dark
+    _refresh_settings_theme(is_dark())
 
     import threading; dlg.exec()
 
@@ -1121,40 +1412,105 @@ def open_schedule_template(app):
 
 # ── 规则编辑 ──
 def edit_rules(app):
+    from ._utils import is_dark
+    dark = is_dark()
+    bg = "#2D2D2D" if dark else "white"
+    tc = "#EEE" if dark else "#333"
+    ibg = "#3D3D3D" if dark else "white"
+    ibd = "#555" if dark else "#DEDEDE"
+
     dlg = QtWidgets.QDialog(app); dlg.setWindowTitle("✏ 编辑温度规则"); dlg.resize(450, 400)
     dlg.setWindowModality(QtCore.Qt.WindowModal)
+    dlg.setStyleSheet(f"QDialog {{ background:{bg}; }}")
     layout = QtWidgets.QVBoxLayout(dlg)
     scroll = QtWidgets.QScrollArea(); scroll.setWidgetResizable(True)
-    sw = QtWidgets.QWidget(); swl = QtWidgets.QVBoxLayout(sw); scroll.setWidget(sw); layout.addWidget(scroll)
+    scroll.setStyleSheet(f"QScrollArea {{ border:none; background:{bg}; }}")
+    sw = QtWidgets.QWidget(); sw.setStyleSheet(f"background:{bg};"); swl = QtWidgets.QVBoxLayout(sw); scroll.setWidget(sw); layout.addWidget(scroll)
     entries = []
     for i, (low, high, target, mode) in enumerate(_cfg.config.get("temp_rules", [
         [36, 99, 24, "cool"], [33, 35, 25, "cool"], [30, 32, 26, "cool"],
         [25, 29, 27, "cool"], [18, 24, 0, "off"], [0, 17, 28, "heat"]
     ])):
-        r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0)
-        rl.addWidget(QtWidgets.QLabel(f"规则{i + 1}:"))
-        e1 = QtWidgets.QLineEdit(str(low)); e1.setFixedWidth(40); rl.addWidget(e1)
-        rl.addWidget(QtWidgets.QLabel("~"))
-        e2 = QtWidgets.QLineEdit(str(high)); e2.setFixedWidth(40); rl.addWidget(e2)
-        rl.addWidget(QtWidgets.QLabel("°C →"))
+        r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0); rl.setSpacing(2)
+        lb = QtWidgets.QLabel(f"规则{i + 1}："); lb.setStyleSheet(f"color:{tc}; font-size:13px;"); rl.addWidget(lb)
+        lb_out = QtWidgets.QLabel("室外"); lb_out.setStyleSheet(f"color:{tc}; font-size:13px;"); rl.addWidget(lb_out)
+        e1 = QtWidgets.QLineEdit(str(low)); e1.setFixedWidth(36); e1.setAlignment(QtCore.Qt.AlignCenter)
+        e1.setStyleSheet(f"color:{tc}; background:{ibg}; border:1px solid {ibd}; border-radius:4px; font-size:13px;"); rl.addWidget(e1)
+        lb_tilde = QtWidgets.QLabel("~"); lb_tilde.setFixedWidth(14); lb_tilde.setAlignment(QtCore.Qt.AlignCenter)
+        lb_tilde.setStyleSheet(f"color:{tc}; font-size:13px;"); rl.addWidget(lb_tilde)
+        e2 = QtWidgets.QLineEdit(str(high)); e2.setFixedWidth(36); e2.setAlignment(QtCore.Qt.AlignCenter)
+        e2.setStyleSheet(f"color:{tc}; background:{ibg}; border:1px solid {ibd}; border-radius:4px; font-size:13px;"); rl.addWidget(e2)
+        lb_c = QtWidgets.QLabel("℃"); lb_c.setStyleSheet(f"color:{tc}; font-size:13px;"); rl.addWidget(lb_c)
+        lb_arr = QtWidgets.QLabel("→"); lb_arr.setStyleSheet(f"color:{tc}; font-size:13px;"); rl.addWidget(lb_arr)
         cb = QtWidgets.QComboBox(); cb.addItems(list(MODES.keys()))
-        cb.setCurrentText(MODE_KEYS.get(mode, "制冷")); cb.setFixedWidth(80); rl.addWidget(cb)
-        e3 = QtWidgets.QLineEdit(str(target)); e3.setFixedWidth(40); rl.addWidget(e3)
-        rl.addWidget(QtWidgets.QLabel("°C")); swl.addWidget(r)
+        cb.setCurrentText(MODE_KEYS.get(mode, "制冷")); cb.setFixedWidth(80)
+        cb.setStyleSheet(f"QComboBox {{ color:{tc}; background:{ibg}; border:1px solid {ibd}; border-radius:4px; padding:2px 4px; font-size:13px; }} QComboBox QAbstractItemView {{ background:{ibg}; color:{tc}; selection-background-color:#2F80ED; font-size:13px; }}")
+        rl.addWidget(cb)
+        # 温度容器 — 永远占位，只隐藏/显示内容
+        temp_holder = QtWidgets.QWidget()
+        temp_holder.setFixedWidth(70)
+        thl = QtWidgets.QHBoxLayout(temp_holder); thl.setContentsMargins(0, 0, 0, 0); thl.setSpacing(2)
+        e3 = QtWidgets.QLineEdit(str(target)); e3.setFixedWidth(40); e3.setAlignment(QtCore.Qt.AlignCenter)
+        e3.setStyleSheet(f"color:{tc}; background:{ibg}; border:1px solid {ibd}; border-radius:4px; font-size:13px;")
+        thl.addWidget(e3)
+        lb4 = QtWidgets.QLabel("°C"); lb4.setStyleSheet(f"color:{tc}; font-size:13px;")
+        thl.addWidget(lb4)
+        rl.addWidget(temp_holder)
+        # 关闭模式隐藏温度内容（容器占位不变）
+        def _make_toggle(_e3, _lb4):
+            def _toggle_temp(txt):
+                hide = txt == "关闭"
+                _e3.setVisible(not hide)
+                _lb4.setVisible(not hide)
+            return _toggle_temp
+        cb.currentTextChanged.connect(_make_toggle(e3, lb4))
+        _make_toggle(e3, lb4)(cb.currentText())
+        swl.addWidget(r)
         entries.append((e1, e2, cb, e3))
 
     btns = QtWidgets.QWidget(); bl = QtWidgets.QHBoxLayout(btns)
-    b = QtWidgets.QPushButton("取消"); b.clicked.connect(dlg.reject); bl.addWidget(b)
-    b = QtWidgets.QPushButton("💾 保存")
+    b = QtWidgets.QPushButton("取消")
+    b.setStyleSheet(f"QPushButton {{ background:{'#555' if dark else 'white'}; color:{'#DDD' if dark else '#333'}; border:1px solid {'#666' if dark else '#DEDEDE'}; border-radius:6px; padding:4px 14px; }} QPushButton:hover {{ background:{'#666' if dark else '#F5F5F5'}; }}")
+    b.clicked.connect(dlg.reject); bl.addWidget(b)
     def save():
         rules = []
         for a, b, c, d in entries:
-            try: rules.append([int(a.text()), int(b.text()), int(d.text()), MODES[c.currentText()]])
+            try:
+                mode_key = MODES[c.currentText()]
+                target = 0 if mode_key == "off" else int(d.text())
+                rules.append([int(a.text()), int(b.text()), target, mode_key])
             except: pass
-        if rules:
-            _cfg.config["temp_rules"] = rules; save_config(_cfg.config); app._refresh_rules_display()
-            write_log("系统", "已更新温度规则")
+        if not rules:
+            return
+        brand = _cfg.config.get("brand", "格力")
+        if brand not in AC_BRANDS:
+            from broadlinkac_core.ir_learner import get_raw_code
+            missing = []
+            for low, high, target, mode in rules:
+                if target == 0:
+                    if not get_raw_code(brand, "off", mode, target, "auto"):
+                        missing.append("关机")
+                else:
+                    mode_ch = MODE_KEYS.get(mode, "制冷")
+                    if not get_raw_code(brand, "on", mode, target, "auto"):
+                        missing.append(f"{mode_ch} {target}°C 自动风")
+            if missing:
+                dups = list(dict.fromkeys(missing))
+                msg = "规则中有自定义遥控器缺少的指令，\n定时或自动调温可能不工作：\n\n" + "\n".join(dups[:10])
+                if len(dups) > 10:
+                    msg += f"\n... 等 {len(dups)} 项"
+                msg += "\n\n请先在设置中学习这些组合。\n仍然要保存当前规则吗？"
+                mb = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Warning, "指令缺失", msg, parent=dlg)
+                save_btn = mb.addButton("保存", QtWidgets.QMessageBox.AcceptRole)
+                mb.addButton("取消", QtWidgets.QMessageBox.RejectRole)
+                mb.exec()
+                if mb.clickedButton() != save_btn:
+                    return
+        _cfg.config["temp_rules"] = rules; save_config(_cfg.config); app._refresh_rules_display()
+        write_log("系统", "已更新温度规则")
         dlg.accept()
+    b = QtWidgets.QPushButton("💾 保存")
+    b.setStyleSheet(f"QPushButton {{ background:{'#2F80ED' if dark else '#0076D4'}; color:white; border:none; border-radius:6px; padding:4px 14px; font-weight:500; }} QPushButton:hover {{ background:{'#1A6FD8' if dark else '#0065B8'}; }}")
     b.clicked.connect(save); bl.addWidget(b)
     layout.addWidget(btns); dlg.exec()
 

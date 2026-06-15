@@ -693,7 +693,11 @@ def main():
         if fp.exists():
             QtGui.QFontDatabase.addApplicationFont(str(fp))
     apply_theme()
-    win = App(); win.show()
+    win = App()
+    if "--tray" in sys.argv:
+        win.hide()  # 静默启动到托盘
+    else:
+        win.show()
     apply_theme()  # 第二次调用：刷新已创建的 widgets（central_bg 等）
     sys.exit(app.exec())
 

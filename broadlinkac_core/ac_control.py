@@ -96,8 +96,20 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
     if not mac:
         mac = _cfg.config.get("current_device_mac", "")
     dev = _cfg.config.get("devices", {}).get(mac, {})
-    brand = _cfg.resolve_brand(dev.get("brand", "格力"))
+    raw_brand = dev.get("brand", "格力")
+    brand = _cfg.resolve_brand(raw_brand)
     t = min(max(temp, 16), 30)
+
+    # ── 自定义品牌：用 ir_learner 生成 raw hex 发送 ──
+    if raw_brand != "格力" and raw_brand not in _cfg.AC_BRANDS:
+        from broadlinkac_core.ir_learner import get_raw_code
+        raw_hex = get_raw_code(raw_brand, power, mode, t, fan)
+        if raw_hex:
+            d = get_device(mac)
+            d.send_data(bytes.fromhex(raw_hex))
+            now = datetime.now()
+            return f"[{now:%H:%M}] {'开机' if power == 'on' else '关机'} → {raw_brand} ({mode} {t}°C)"
+        return f"[{datetime.now():%H:%M}] 自定义品牌 '{raw_brand}' 中未找到匹配码"
 
     # 优先 hvac_ir（标准化 API），回退自定义 protocols
     try:
