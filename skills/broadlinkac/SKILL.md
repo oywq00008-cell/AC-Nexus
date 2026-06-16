@@ -1,13 +1,13 @@
 ---
 name: broadlinkac
-version: 5.0.2
+version: 5.1.0
 identifier: oywq00008-cell-broadlinkac-for-agent-skill
 description: 🎮 AI Agent 智能空调控制核心库 — 零 GUI 依赖，import 即用。支持 17 大品牌空调（格力/美的/海尔/大金等），直连 Broadlink RM 红外遥控器。百度+和风双天气源，中央气象台+NHC 双风暴源，多日期组定时模板，Markdown 日志，故障诊断。适配树莓派/NAS/OpenWRT/桌面全平台。
 ---
 
-# BroadlinkAC — AI Agent Smart AC Controller v5.0.2
+# BroadlinkAC — AI Agent Smart AC Controller v5.1.0
 
-Cross-platform AC control library for Broadlink RM series IR blasters. **Zero GUI dependency** — designed for AI agents to clone, install, and control air conditioners programmatically.
+Cross-platform AC control library for Broadlink RM series IR blasters. **Zero GUI dependency** — designed for AI agents to clone, install, and control air conditioners programmatically. Now includes **IR learning** — teach the system codes from any original remote, no brand limits.
 
 ## ⚠️ Safety & Persistence
 
@@ -59,7 +59,7 @@ if dist < 100:
 |----------|-------------|
 | `init(baidu_key=None, api_key=None, qw_host=None, location=None, brand=None)` | Initialize config + start background scheduler. **Writes to `~/.ac_controller/config.json`**. Idempotent — safe to call multiple times. |
 
-### AC Control (17 brands)
+### AC Control (17 brands + IR learning)
 | Function | Description |
 |----------|-------------|
 | `send_ac(power, mode, temp, fan)` | Send IR command. `power`: `"on"`/`"off"`. `mode`: `"cool"`/`"heat"`/`"dry"`/`"fan"`/`"auto"`. `temp`: 16-30. `fan`: `"auto"`/`"1"`/`"2"`/`"3"` |
@@ -67,6 +67,17 @@ if dist < 100:
 | `get_device()` | Get connected Broadlink device |
 
 > `send_ac` covers the minimum universal set across all brands. For advanced features (turbo, swing, etc.), modify `ac_control.py` locally.
+
+### IR Learning (support any brand)
+| Function | Description |
+|----------|-------------|
+| `learn_one(host)` | Enter learning mode on Broadlink device, wait for IR signal → returns raw hex or `None` (timeout 45s) |
+| `get_raw_code(name, power, mode, temp, fan)` | Look up learned hex code for a custom device |
+| `load_custom_codes()` | Load all custom codes from `~/.ac_controller/custom_codes.json` |
+| `save_custom_codes(data)` | Persist learned codes |
+| `list_custom()` | List all custom device names |
+
+> Use `ir_learner` to teach the system codes from any AC remote — no brand limits. Codes persist automatically and `send_ac` routes to learned codes when the current brand is a custom one.
 
 ### Weather & Alerts (Dual Source: Baidu + QWeather)
 | Function | Description |
@@ -145,6 +156,22 @@ w = fetch_weather()
 alerts, provider = fetch_weather_alerts()
 for a in alerts:
     print(f"[{a['severity']}] {a['headline']}")
+```
+
+### "Learn IR codes for a custom AC brand"
+```python
+from broadlinkac_core.ir_learner import learn_one, save_learned_codes, get_raw_code
+
+# Learn "OFF" signal
+hex_off = learn_one("192.168.1.100")  # Broadlink device IP
+save_learned_codes("MyAC", "gree", {"关机": hex_off})
+
+# Learn "Cool 26°C Auto Fan"
+hex_cool = learn_one("192.168.1.100")
+save_learned_codes("MyAC", "gree", {"开机_制冷_26°C_自动": hex_cool})
+
+# Send learned code
+send_ac("on", "cool", 26, "auto")  # Routes to learned hex automatically
 ```
 
 ## Scheduling & Automation
