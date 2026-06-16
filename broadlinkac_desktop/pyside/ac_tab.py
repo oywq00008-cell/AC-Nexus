@@ -284,23 +284,32 @@ def _control_card(app):
     _ctrl_row("模式", app._mode_cb)
 
     # 温度
+    from ._utils import is_dark
+    dark = is_dark()
     temp_frame = QtWidgets.QFrame()
     temp_frame.setStyleSheet("QFrame { background:transparent; }")
     temp_frame.setMinimumWidth(250)
     temp_frame.setFixedHeight(32)
+    temp_btn_bg = "#3D3D3D" if dark else "#F0F0F0"
+    temp_btn_hover = "#555" if dark else "#DEE4EA"
+    temp_btn_color = "#DCDCDC" if dark else "#333"
+    temp_btn_qss = f"QPushButton {{ border:none; background:{temp_btn_bg}; color:{temp_btn_color}; border-radius:8px; font-size:16px; font-weight:bold; }} QPushButton:hover {{ background:{temp_btn_hover}; }}"
     tfl = QtWidgets.QHBoxLayout(temp_frame); tfl.setContentsMargins(0, 0, 0, 0); tfl.setSpacing(0)
     b = QtWidgets.QPushButton("−"); b.setFixedSize(38, 32); b.clicked.connect(app._temp_down)
+    b.setObjectName("temp_down_btn")
     b.setCursor(QtCore.Qt.PointingHandCursor)
-    b.setStyleSheet("QPushButton { border:none; background:#F0F0F0; border-radius:8px; font-size:16px; font-weight:bold; } QPushButton:hover { background:#DEE4EA; }")
+    b.setStyleSheet(temp_btn_qss)
     tfl.addWidget(b)
     tfl.addStretch()
-    app._temp_lbl = lbl("26°C", size=14, bold=False, color="#2F80ED")
+    temp_label_color = "#5B9BD5" if dark else "#2F80ED"
+    app._temp_lbl = lbl("26°C", size=14, bold=False, color=temp_label_color)
     app._temp_lbl.setAlignment(QtCore.Qt.AlignCenter); app._temp_lbl.setFixedWidth(50)
     tfl.addWidget(app._temp_lbl)
     tfl.addStretch()
     b = QtWidgets.QPushButton("+"); b.setFixedSize(38, 32); b.clicked.connect(app._temp_up)
+    b.setObjectName("temp_up_btn")
     b.setCursor(QtCore.Qt.PointingHandCursor)
-    b.setStyleSheet("QPushButton { border:none; background:#F0F0F0; border-radius:8px; font-size:16px; font-weight:bold; } QPushButton:hover { background:#DEE4EA; }")
+    b.setStyleSheet(temp_btn_qss)
     tfl.addWidget(b)
     _ctrl_row("温度", temp_frame)
 

@@ -1,13 +1,16 @@
 """学习向导 v2 — 全局码库 + 自由组合学习"""
 
-from PySide6 import QtCore, QtWidgets
+import sys
+
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from broadlinkac_core.ir_learner import save_learned_codes
 
-from ._utils import lbl
+from ._utils import lbl, is_dark
+
 
 LOGO_LIST = [
-    ("🈚 无Logo", ""), ("格力", "gree"), ("美的", "midea"), ("海尔", "haier"),
+    ("无Logo", ""), ("格力", "gree"), ("美的", "midea"), ("海尔", "haier"),
     ("奥克斯", "aux_ac"), ("松下", "panasonic"), ("海信", "hisense"),
     ("大金", "daikin"), ("三菱", "mitsubishi"), ("日立", "hitachi"),
     ("富士通", "fujitsu"), ("小米", "midea"),
@@ -22,14 +25,53 @@ TEMP_RANGE = list(range(16, 31))
 
 
 def _dialog_frame(parent, title, w, h):
-    """创建统一样式的弹窗壳"""
-    dlg = QtWidgets.QDialog(parent)
+    """创建统一样式的弹窗壳 — Windows 下自绘无边框圆角"""
+    if sys.platform == "win32":
+        dlg = QtWidgets.QDialog(parent, QtCore.Qt.FramelessWindowHint)
+        dlg.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+    else:
+        dlg = QtWidgets.QDialog(parent)
     dlg.setWindowModality(QtCore.Qt.WindowModal)
     dlg.resize(w, h)
     dlg.setWindowTitle(title)
-    content = QtWidgets.QVBoxLayout(dlg)
-    content.setContentsMargins(16, 12, 16, 12)
-    return dlg, content
+
+    if sys.platform == "win32":
+        dark = is_dark()
+        outer_bg = "#2D2D2D" if dark else "white"
+        outer_bd = "#444" if dark else "#DEDEDE"
+        outer = QtWidgets.QFrame(dlg)
+        outer.setObjectName("learn_outer")
+        outer.setStyleSheet(f"QFrame#learn_outer {{ background:{outer_bg}; border:2px solid {outer_bd}; border-radius:12px; }}")
+        ov = QtWidgets.QVBoxLayout(outer); ov.setContentsMargins(0, 0, 0, 0); ov.setSpacing(0)
+
+        # 自绘标题栏
+        tb = QtWidgets.QWidget(); tb.setFixedHeight(36)
+        tb.setStyleSheet(f"background: transparent; border-bottom: 1px solid {outer_bd};")
+        t_bl = QtWidgets.QHBoxLayout(tb); t_bl.setContentsMargins(16, 0, 8, 0)
+        t_bl.addWidget(lbl(title, bold=True, size=13))
+        t_bl.addStretch()
+        close_btn = QtWidgets.QPushButton("✕"); close_btn.setFixedSize(28, 28); close_btn.setFlat(True)
+        close_btn.setStyleSheet(f"QPushButton {{ font-size:14px; color:{'#AAA' if dark else '#888'}; border:none; background:transparent; }} QPushButton:hover {{ background:{'#444' if dark else '#F0F0F0'}; border-radius:4px; }}")
+        close_btn.clicked.connect(dlg.reject); t_bl.addWidget(close_btn)
+        ov.addWidget(tb)
+
+        # 标题栏拖拽
+        def move_window(event):
+            if event.buttons() == QtCore.Qt.LeftButton:
+                dlg.move(event.globalPosition().toPoint() - tb.property("drag_pos"))
+        tb.mouseMoveEvent = move_window
+        tb.mousePressEvent = lambda e: tb.setProperty("drag_pos", e.globalPosition().toPoint() - dlg.frameGeometry().topLeft())
+
+        layout = QtWidgets.QVBoxLayout(); layout.setContentsMargins(12, 8, 12, 12)
+        ov.addLayout(layout)
+        full = QtWidgets.QVBoxLayout(dlg); full.setContentsMargins(0, 0, 0, 0); full.addWidget(outer)
+    else:
+        layout = QtWidgets.QVBoxLayout(dlg)
+        layout.setContentsMargins(16, 12, 16, 12)
+        dark = is_dark()
+        dlg.setStyleSheet(f"QDialog {{ background:{'#2D2D2D' if dark else 'white'}; }}")
+
+    return dlg, layout
 
 
 def _combo(label_text, items, default=None):
@@ -51,15 +93,25 @@ class NewRemoteDialog:
         self.edit_name = edit_name
         self.edit_codes = edit_codes or {}
         title = f"编辑 {edit_name}" if edit_mode else "新增自定义遥控器"
-        self.dlg, layout = _dialog_frame(parent, title, 480, 500)
+        self.dlg, layout = _dialog_frame(parent, title, 450, 500)
         layout.setSpacing(8)
-        layout.addWidget(lbl(title, bold=True, size=13))
-        layout.addWidget(lbl("设置设备名称、Logo，添加要学习的组合", color="gray", size=11))
+
+        dark = is_dark()
+        tc = "#EEE" if dark else "#333"
+        ibg = "#3D3D3D" if dark else "white"
+        ibd = "#555" if dark else "#DEDEDE"
+        hint_color = "#888" if dark else "gray"
+        inp_qss = f"QLineEdit {{ padding:6px; border:1px solid {ibd}; border-radius:4px; color:{tc}; background:{ibg}; }}"
+        cb_qss = f"QComboBox {{ padding:4px; border:1px solid {ibd}; border-radius:4px; color:{tc}; background:{ibg}; }} QComboBox QAbstractItemView {{ background:{ibg}; color:{tc}; selection-background-color:#2F80ED; }}"
+        list_qss = f"QListWidget {{ border:1px solid {ibd}; border-radius:4px; color:{tc}; background:{ibg}; }} QListWidget::item {{ padding:4px; }}"
+        add_btn_qss = f"QPushButton {{ color:#2F80ED; border:1px solid #2F80ED; border-radius:4px; padding:4px 8px; }} QPushButton:hover {{ background:{'#1E3A5F' if dark else '#E8F0FE'}; }}"
+
+        layout.addWidget(lbl("设置设备名称、Logo，添加要学习的组合", color=hint_color, size=11))
 
         layout.addWidget(lbl("设备名称 *:", size=11))
         self.name_entry = QtWidgets.QLineEdit()
         self.name_entry.setPlaceholderText("例：卧室的格力空调")
-        self.name_entry.setStyleSheet("QLineEdit { padding:6px; border:1px solid #DEDEDE; border-radius:4px; }")
+        self.name_entry.setStyleSheet(inp_qss)
         if edit_mode:
             self.name_entry.setText(edit_name)
         layout.addWidget(self.name_entry)
@@ -67,7 +119,7 @@ class NewRemoteDialog:
         layout.addWidget(lbl("品牌Logo:", size=11))
         self.logo_combo = QtWidgets.QComboBox()
         self.logo_combo.addItems([l[0] for l in LOGO_LIST])
-        self.logo_combo.setStyleSheet("QComboBox { padding:4px; border:1px solid #DEDEDE; border-radius:4px; }")
+        self.logo_combo.setStyleSheet(cb_qss)
         if edit_mode and edit_logo:
             for i, l in enumerate(LOGO_LIST):
                 if l[1] == edit_logo:
@@ -78,7 +130,7 @@ class NewRemoteDialog:
         layout.addWidget(lbl("学习组合列表 (关机自动添加):", bold=True, size=11))
 
         self.combo_list = QtWidgets.QListWidget()
-        self.combo_list.setStyleSheet("QListWidget { border:1px solid #DEDEDE; border-radius:4px; } QListWidget::item { padding:4px; }")
+        self.combo_list.setStyleSheet(list_qss)
         layout.addWidget(self.combo_list)
 
         # 编辑模式：加载已有组合
@@ -97,7 +149,7 @@ class NewRemoteDialog:
         _, self.fan_cb = _combo("风速:", FANS_LIST, "自动")
         arl.addWidget(_)
         add_btn = QtWidgets.QPushButton("＋ 添加")
-        add_btn.setStyleSheet("QPushButton { color:#2F80ED; border:1px solid #2F80ED; border-radius:4px; padding:4px 8px; } QPushButton:hover { background:#E8F0FE; }")
+        add_btn.setStyleSheet(add_btn_qss)
         add_btn.clicked.connect(self._add_combo)
         arl.addWidget(add_btn)
         layout.addWidget(add_row)
@@ -109,16 +161,22 @@ class NewRemoteDialog:
         layout.addStretch()
         btn_row = QtWidgets.QWidget(); brl = QtWidgets.QHBoxLayout(btn_row)
         brl.addStretch()
-        brl.addWidget(QtWidgets.QPushButton("取消", clicked=self.dlg.reject))
+        cancel_btn = QtWidgets.QPushButton("取消")
+        cancel_btn.setFixedHeight(30)
+        cancel_btn.setStyleSheet(f"QPushButton {{ background:{'#555' if dark else 'white'}; color:{'#DDD' if dark else '#333'}; border:1px solid {'#666' if dark else '#DEDEDE'}; border-radius:6px; padding:0 16px; font-size:13px; }} QPushButton:hover {{ background:{'#666' if dark else '#F5F5F5'}; }}")
+        cancel_btn.clicked.connect(self.dlg.reject)
+        brl.addWidget(cancel_btn)
 
         if edit_mode:
-            save_btn = QtWidgets.QPushButton("💾 保存")
-            save_btn.setStyleSheet("QPushButton { color:#27AE60; border:1px solid #27AE60; border-radius:4px; padding:6px 12px; } QPushButton:hover { background:#E8F8F0; }")
+            save_btn = QtWidgets.QPushButton("保存")
+            save_btn.setFixedHeight(30)
+            save_btn.setStyleSheet(f"QPushButton {{ background:{'#4CAF50' if dark else '#27AE60'}; color:white; border:none; border-radius:6px; padding:0 16px; font-size:13px; font-weight:500; }} QPushButton:hover {{ background:{'#388E3C' if dark else '#1E8E3E'}; }}")
             save_btn.clicked.connect(self._save_only)
             brl.addWidget(save_btn)
 
-        self.start_btn = QtWidgets.QPushButton("🎓 开始学习")
-        self.start_btn.setStyleSheet("QPushButton { background:#2F80ED; color:white; padding:6px 16px; border-radius:4px; font-weight:bold; } QPushButton:hover { background:#2569D4; }")
+        self.start_btn = QtWidgets.QPushButton("开始学习")
+        self.start_btn.setFixedHeight(30)
+        self.start_btn.setStyleSheet(f"QPushButton {{ background:{'#2F80ED' if not dark else '#3B82F6'}; color:white; border:none; border-radius:6px; padding:0 16px; font-size:13px; font-weight:500; }} QPushButton:hover {{ background:{'#2569D4' if not dark else '#1D4ED8'}; }}")
         self.start_btn.clicked.connect(self._start_learn)
         brl.addWidget(self.start_btn)
         layout.addWidget(btn_row)
@@ -176,12 +234,12 @@ class NewRemoteDialog:
         idx = self.logo_combo.currentIndex()
         logo = LOGO_LIST[idx][1] if 0 <= idx < len(LOGO_LIST) else ""
 
-        categories = {"关机": "请先打开遥控器，然后对准博联设备按遥控器的【关机】键"}
+        categories = {"关机": "请先打开遥控器，然后对准红外设备按遥控器的【关机】键"}
         for combo in combos:
             parts = combo.replace("开机_", "").replace("°C", "").split("_")
             if len(parts) >= 3:
                 m, t, f = parts[0], parts[1], parts[2]
-                categories[combo] = f"请在遥控器上设为：模式【{m}】、温度【{t}°C】、风速【{f}】。\n设好后关掉遥控器，对准博联设备按【开机】"
+                categories[combo] = f"请在遥控器上设为：模式【{m}】、温度【{t}°C】、风速【{f}】。\n设好后关掉遥控器，对准红外设备按【开机】"
 
         if self.edit_mode:
             # 编辑模式：只学新增的组合
@@ -233,7 +291,7 @@ class LearnWizard:
         dev = _cfg.get_current_device()
         host = dev.get("host", "")
         if not host:
-            QtWidgets.QMessageBox.warning(self.dlg, "错误", "请先在主界面连接博联设备")
+            QtWidgets.QMessageBox.warning(self.dlg, "错误", "请先在主界面连接红外设备")
             return None
         return host
 
@@ -242,15 +300,20 @@ class LearnWizard:
             item = self.layout.takeAt(0)
             if item.widget(): item.widget().deleteLater()
 
+        dark = is_dark()
+        tc = "#EEE" if dark else "#333"
+        hint = "#AAA" if dark else "#555"
+        dim = "#888" if dark else "#888"
+
         label, instruction = self.steps[self.current_step]
         total = len(self.steps)
         self.dlg.setWindowTitle(f"学习向导 ({self.current_step + 1}/{total})")
 
-        self.layout.addWidget(lbl(label.replace("开机_", ""), bold=True, size=14))
-        self.layout.addWidget(lbl(instruction, color="#555", size=11))
+        self.layout.addWidget(lbl(label.replace("开机_", ""), bold=True, size=14, color=tc), alignment=QtCore.Qt.AlignCenter)
+        self.layout.addWidget(lbl(instruction, color=hint, size=11))
         self.layout.addSpacing(6)
 
-        self.status_label = lbl("等待开始...", color="#888", size=11)
+        self.status_label = lbl("如果你准备好了，请点击开始捕获", color=dim, size=11)
         self.status_label.setAlignment(QtCore.Qt.AlignCenter)
         self.layout.addWidget(self.status_label)
 
@@ -262,9 +325,12 @@ class LearnWizard:
 
         btn_row = QtWidgets.QWidget(); brl = QtWidgets.QHBoxLayout(btn_row)
         brl.addStretch()
-        brl.addWidget(QtWidgets.QPushButton("取消", clicked=self.dlg.reject))
+        cancel_btn = QtWidgets.QPushButton("取消")
+        cancel_btn.setStyleSheet(f"QPushButton {{ background:{'#555' if dark else 'white'}; color:{'#DDD' if dark else '#333'}; border:1px solid {'#666' if dark else '#DEDEDE'}; border-radius:6px; padding:4px 14px; }} QPushButton:hover {{ background:{'#666' if dark else '#F5F5F5'}; }}")
+        cancel_btn.clicked.connect(self.dlg.reject)
+        brl.addWidget(cancel_btn)
         self.capture_btn = QtWidgets.QPushButton("🎯 开始捕获")
-        self.capture_btn.setStyleSheet("QPushButton { background:#2F80ED; color:white; padding:6px 16px; border-radius:4px; font-weight:bold; } QPushButton:hover { background:#2569D4; } QPushButton:disabled { background:#888; }")
+        self.capture_btn.setStyleSheet(f"QPushButton {{ background:{'#2F80ED' if not dark else '#3B82F6'}; color:white; padding:6px 16px; border-radius:4px; font-weight:bold; }} QPushButton:hover {{ background:{'#2569D4' if not dark else '#1D4ED8'}; }} QPushButton:disabled {{ background:#888; }}")
         self.capture_btn.clicked.connect(self._start_capture)
         brl.addWidget(self.capture_btn)
         self.layout.addWidget(btn_row)
@@ -276,7 +342,7 @@ class LearnWizard:
         self.host = host
         self.capturing = True
         self.capture_btn.setEnabled(False)
-        self.status_label.setText("学习模式已启动，请对准博联设备按下遥控器按键...")
+        self.status_label.setText("学习模式已启动，请对准红外设备按下遥控器按键...")
         self.status_label.setStyleSheet("color:#2F80ED;")
         import broadlink
         try:

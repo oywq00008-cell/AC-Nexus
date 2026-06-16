@@ -23,8 +23,8 @@ from .pyside.ty_tab import (
 )
 from .pyside.dialogs import (
     open_settings, open_repair, open_log_dialog, edit_rules, edit_ty_alert,
-    apply_theme,
 )
+from .pyside.theme import apply_theme
 from .pyside._utils import lbl
 
 APP_NAME = "BroadlinkAC"
