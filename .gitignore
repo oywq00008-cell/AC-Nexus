@@ -32,3 +32,6 @@ homebrew-tap/
 # IDE
 .vscode/
 .idea/
+
+# Not needed
+CHANGELOG.md
