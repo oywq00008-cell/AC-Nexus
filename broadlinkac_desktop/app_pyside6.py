@@ -38,7 +38,7 @@ class App(QtWidgets.QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(APP_NAME + "  v5.0")
+        self.setWindowTitle(APP_NAME + "  v5.1")
         self.resize(865, 780)
         self.setMinimumSize(760, 650)
 
@@ -442,7 +442,7 @@ class App(QtWidgets.QMainWindow):
         status_label.setProperty("status_label_kind", "ok")
         self._status_label = status_label
         sb.addWidget(status_label)
-        self._version_label = QtWidgets.QLabel("当前版本：v5.0")
+        self._version_label = QtWidgets.QLabel("当前版本：v5.1")
         self._version_label.setStyleSheet("color:#999;")
         self._version_label.setProperty("status_label_kind", "version")
         sb.addPermanentWidget(self._version_label)

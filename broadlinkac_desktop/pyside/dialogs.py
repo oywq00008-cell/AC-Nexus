@@ -79,7 +79,7 @@ def open_about(parent):
     layout, swl = _dialog_content(dlg, frameless=True)
 
     layout.addStretch()
-    layout.addWidget(lbl("BroadlinkAC v5.0", bold=True, size=18), alignment=QtCore.Qt.AlignCenter)
+    layout.addWidget(lbl("BroadlinkAC v5.1", bold=True, size=18), alignment=QtCore.Qt.AlignCenter)
     layout.addSpacing(10)
     layout.addWidget(lbl("智能空调控制系统", size=13), alignment=QtCore.Qt.AlignCenter)
     layout.addWidget(lbl("支持 Broadlink RM 系列红外设备", color="#666", size=11), alignment=QtCore.Qt.AlignCenter)

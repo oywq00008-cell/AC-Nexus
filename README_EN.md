@@ -1,4 +1,4 @@
-# 🎮 BroadlinkAC v5.0
+# 🎮 BroadlinkAC v5.1
 
 [中文](README.md) | English
 
