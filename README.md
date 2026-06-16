@@ -2,7 +2,7 @@
 
 [English](README_EN.md) | 中文
 
-BroadlinkAC 不止是一个空调遥控器桌面应用——它是一套**为 AI Agent 而生的红外控制协议栈**。接入博联 RM 红外模块后，任何 AI Agent 只需 `import broadlinkac_core`，即可用一行 Python 控制格力、日立、大金等 **17 种品牌**的空调。支持多设备并行调度、室外温度自适应调温、台风路径预报，桌面应用（PySide6）和命令行/Agent 两个模式共享同一套核心，Windows / macOS / Linux 即装即用。
+BroadlinkAC 不止是一个空调遥控器桌面应用——它是一套**为 AI Agent 而生的红外控制协议栈**。接入博联 RM 红外模块后，任何 AI Agent 只需 `import broadlinkac_core`，即可用一行 Python 控制格力、日立、大金等 **17 种品牌**的空调。内置 **红外学习功能**，用原装遥控器"教"软件发码即可适配列表外的品牌。支持多设备并行调度、室外温度自适应调温、台风路径预报，桌面应用（PySide6）和命令行/Agent 两个模式共享同一套核心，Windows / macOS / Linux 即装即用。
 
 ## 🤖 Agent 调用
 
@@ -58,13 +58,14 @@ Agent 传参 `brand="日立"` 或 `brand="hitachi"` 均可自动解析。
 ## ✨ 功能
 
 - 📡 **多设备** — 局域网自动发现，下拉切换，离线标注
+- 🎓 **红外学习** — 品牌列表外的空调可用原装遥控器学习发码，支持任意组合（关机/模式+温度+风速）
 - ⏰ **定时模板** — 多日期组独立设置（工作日/周末不同时段）
-- 🌡️ **智能温控** — 室外温度变化自动调整制冷/制热目标
+- 🌡️ **智能温控** — 室外温度变化自动调整制冷/制热目标；编辑规则时自动检测自定义遥控器指令是否够用
 - 🌤️ **双源天气** — 百度 / 和风，一键切换
 - 🌀 **双源风暴** — 中国中央气象台 (NMC) + 美国飓风中心 (NHC)，路径预报图
 - 🌪️ **风暴保护** — 距离 < 100km 自动关闭所有空调
 - ⚠️ **预警信息** — 风暴监测 + 当地天气预警，左右分栏
-- 🎨 **深色主题** — 浅色/深色一键切换
+- 🎨 **深色主题** — 浅色/深色/跟随系统，选择即生效
 - 📋 **操作日志** — 按日期检索
 - 🔧 **故障诊断** — 自动检测环境和设备
 
@@ -131,18 +132,25 @@ send_ac("on", "cool", 26, "auto")
 ac_controller_pyside6.py      # PySide6 入口
 broadlinkac_core/             # 核心库（零 GUI 依赖）
 ├── __init__.py               # 公共 API
-├── config.py                 # 配置 + resolve_brand() + 设备管理
+├── config.py                 # 配置 + resolve_brand() + 设备管理 + 城市搜索
 ├── weather.py                # 双源天气 + 预警
 ├── typhoon.py                # 风暴 (NMC) + 飓风 (NHC) + KMZ 预报
-├── ac_control.py             # 空调控制 + 动态协议导入
+├── ac_control.py             # 空调控制 + 动态协议导入 + 学习码支持
+├── ir_learner.py             # 红外学习核心 (learn_one / get_raw_code)
 ├── scheduler.py              # 定时调度（多日期组模板）
+├── autostart.py              # 三平台开机自启
 └── logger.py                 # 日志
 broadlinkac_desktop/          # PySide6 桌面 GUI
-├── app_pyside6.py            # 主窗口
-└── pyside/                   # UI 模块
+├── app_pyside6.py            # 主窗口 + 全局样式
+└── pyside/                   # UI 模块（6 文件）
     ├── ac_tab.py             # 空调 + 天气 + 定时 + 规则
     ├── ty_tab.py             # 台风 + 预警 + 预报图
-    ├── dialogs.py            # 所有弹窗
+    ├── theme.py              # 主题引擎（浅色/深色/跟随系统）
+    ├── settings_dialog.py    # 设置对话框
+    ├── schedule_dialog.py    # 定时模板编辑
+    ├── repair_dialog.py      # 故障诊断
+    ├── learn_dialog.py       # 红外学习向导
+    ├── dialogs.py            # 基础对话框 + 规则 + 台风提醒
     └── _utils.py             # 工具函数
 protocols/                    # 自研红外协议
 logos/                        # 品牌 Logo
