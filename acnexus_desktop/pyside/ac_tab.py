@@ -3,9 +3,9 @@
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import broadlinkac_core.config as _cfg
-from broadlinkac_core.config import save_config
-from broadlinkac_core.ac_control import MODES, FANS, MODE_KEYS
+import acnexus_core.config as _cfg
+from acnexus_core.config import save_config
+from acnexus_core.ac_control import MODES, FANS, MODE_KEYS
 from ._utils import frm, lbl, toggle, _DARK
 
 
@@ -201,7 +201,7 @@ def _weather_card(app):
 
 
 def _control_card(app):
-    from broadlinkac_core.config import get_current_device
+    from acnexus_core.config import get_current_device
 
     cc = frm()
     cv = QtWidgets.QVBoxLayout(cc)
@@ -348,7 +348,11 @@ def _control_card(app):
 
 
 def update_brand_logo(app):
-    """更新品牌 Logo"""
+    """更新品牌 Logo 和控制标题"""
+    if getattr(app, '_brand_type', 'broadlink') == "xiaomi_cloud":
+        app._logo_lbl.clear()
+        app._ctrl_title.setText("米家空调控制")
+        return
     brand_cn = _cfg.config.get("brand", "格力")
     brand_key = _cfg.AC_BRANDS.get(brand_cn, "gree")
     LOGO_NAME = {
@@ -398,7 +402,8 @@ def _schedule_card(app, grid):
         tmpl_cb.clear()
         tmpl_cb.addItems(["< 关闭定时 >"] + list((_cfg.config.get("schedule_templates") or {}).keys()))
         mac = _cfg.config.get("current_device_mac", "")
-        dev = _cfg.config.get("devices", {}).get(mac, {})
+        provider = _cfg.config.get("current_brand_type", "broadlink")
+        dev = _cfg.config.get("devices", {}).get(provider, {}).get(mac, {})
         active = dev.get("active_template", "")
         if active and active in (_cfg.config.get("schedule_templates") or {}):
             tmpl_cb.setCurrentText(active)
@@ -407,24 +412,28 @@ def _schedule_card(app, grid):
         tmpl_cb.blockSignals(False)
     _refresh_tmpl_cb()
 
+    # 挂到 app 上供 _refresh_device_ui 调用
+    app._refresh_tmpl_cb = _refresh_tmpl_cb
+
     def _on_tmpl_switch(t):
         mac = _cfg.config.get("current_device_mac", "")
-        dev = _cfg.config.setdefault("devices", {}).setdefault(mac, {})
+        provider = _cfg.config.get("current_brand_type", "broadlink")
+        dev = _cfg.config.setdefault("devices", {}).setdefault(provider, {}).setdefault(mac, {})
         if t == "< 关闭定时 >":
             dev.pop("active_template", None)
             dev["schedule_enabled"] = False
             _cfg.config["schedule_enabled"] = False
-            from broadlinkac_core.logger import write_log
+            from acnexus_core.logger import write_log
             write_log("定时", "已关闭")
         else:
             dev["active_template"] = t
             dev["schedule_enabled"] = True
             _cfg.config["schedule_enabled"] = True
-            from broadlinkac_core.logger import write_log
+            from acnexus_core.logger import write_log
             write_log("定时", f"已开启 → {t}")
         save_config(_cfg.config)
-        from broadlinkac_core.scheduler import register_all_jobs
-        import broadlinkac_core.scheduler as _sched
+        from acnexus_core.scheduler import register_all_jobs
+        import acnexus_core.scheduler as _sched
         with _sched._sched_lock: register_all_jobs()
         _update_schedule_display(app)
     tmpl_cb.currentTextChanged.connect(_on_tmpl_switch)
@@ -437,8 +446,7 @@ def _schedule_card(app, grid):
     bd = "#444" if _DARK else "#DEDEDE"
     summary_box.setStyleSheet(f"""
         QFrame#sched_summary_box {{ background:{bg}; border:1px solid {bd}; border-radius:8px; }}
-        QFrame#sched_summary_box QWidget {{ background-color:transparent; }}
-    """)
+""")
     app._sched_summary_layout = QtWidgets.QVBoxLayout(summary_box)
     app._sched_summary_layout.setContentsMargins(12, 10, 12, 10)
     app._sched_summary_layout.setSpacing(8)
@@ -459,31 +467,35 @@ def _schedule_card(app, grid):
     _rules_card(app, grid)
 
 
-def _update_schedule_display(app):
+def _update_schedule_display(app, dark=None):
     """刷新定时摘要（供外部调用），支持多日期组 — 每组独立 mini-frame"""
     from .dialogs import _schedule_summary
-    from ._utils import _DARK as _dark
+    if dark is None:
+        from ._utils import is_dark
+        dark = is_dark()
+    _dark = dark
     if not hasattr(app, '_sched_summary_box'):
         return
     data = _schedule_summary(app)
     layout = app._sched_summary_layout
-    # 清空旧内容
+    # 清空旧内容（用 setParent(None) 立即释放，避免 deleteLater 异步残留）
     while layout.count():
         w = layout.takeAt(0).widget()
-        if w: w.deleteLater()
+        if w:
+            w.hide()
+            w.setParent(None)
 
     base = str(_base_dir() / "icons")
     sep_color = "#444" if _dark else "#DEDEDE"
     day_color = "#CCC" if _dark else "#555"
     time_color = "#EEE" if _dark else "#333"
-
     dim_color = "#888" if _dark else "#999"
 
     error = data.get("error")
     if error:
         lbl = QtWidgets.QLabel(error)
         lbl.setStyleSheet(f"font-size:14px; color:{dim_color};")
-        lbl.setProperty("label_color", dim_color)
+        lbl.setProperty("label_color", "#999")  # 存原始浅色值，供 refresh_labels 重映射
         layout.addWidget(lbl, alignment=QtCore.Qt.AlignCenter)
         return
 
@@ -491,7 +503,7 @@ def _update_schedule_display(app):
     if not groups:
         lbl = QtWidgets.QLabel("无时段设置")
         lbl.setStyleSheet(f"font-size:14px; color:{dim_color};")
-        lbl.setProperty("label_color", dim_color)
+        lbl.setProperty("label_color", "#999")  # 存原始浅色值，供 refresh_labels 重映射
         layout.addWidget(lbl, alignment=QtCore.Qt.AlignCenter)
         return
 
@@ -515,7 +527,7 @@ def _update_schedule_display(app):
         drl.addWidget(cal_icon, alignment=QtCore.Qt.AlignVCenter)
         day_lbl = QtWidgets.QLabel(days_str)
         day_lbl.setStyleSheet(f"font-size:14px; color:{day_color};")
-        day_lbl.setProperty("label_color", day_color)
+        day_lbl.setProperty("label_color", "#555")  # 存原始浅色值，供 refresh_labels 重映射
         drl.addWidget(day_lbl, 1)
         drl.addStretch()
         layout.addWidget(day_row)
@@ -535,7 +547,7 @@ def _update_schedule_display(app):
         trl.addWidget(clk_icon, alignment=QtCore.Qt.AlignVCenter)
         time_lbl = QtWidgets.QLabel("  →  ".join(times) if times else "")
         time_lbl.setStyleSheet(f"font-size:15px; color:{time_color}; font-weight:bold;")
-        time_lbl.setProperty("label_color", time_color)
+        time_lbl.setProperty("label_color", "#333")  # 存原始浅色值，供 refresh_labels 重映射
         trl.addWidget(time_lbl, 1)
         trl.addStretch()
         layout.addWidget(time_row)

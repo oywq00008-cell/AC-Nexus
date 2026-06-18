@@ -9,9 +9,9 @@ import urllib.request
 
 from PySide6 import QtCore, QtWidgets
 
-import broadlinkac_core.config as _cfg
-from broadlinkac_core.config import save_config
-from broadlinkac_core.ac_control import discover_devices
+import acnexus_core.config as _cfg
+from acnexus_core.config import save_config
+from acnexus_core.ac_control import discover_devices
 from ._utils import lbl
 
 
@@ -76,7 +76,7 @@ def open_repair(app):
         # ── 设备扫描 ──
         push(lines, "┌─ 博联设备扫描 ─────────", "#888")
         push(lines, "│ 🔍 扫描局域网中...", "#E67E22")
-        from broadlinkac_core.config import get_current_device, add_or_update_device
+        from acnexus_core.config import get_current_device, add_or_update_device
         old_dev = get_current_device()
         old_ip = old_dev.get("host") if old_dev else None
         try:
@@ -121,7 +121,7 @@ def open_repair(app):
                 ctx = ssl.create_default_context()
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
-                req = urllib.request.Request("https://www.baidu.com", headers={"User-Agent": "BroadlinkAC/5.0"})
+                req = urllib.request.Request("https://www.baidu.com", headers={"User-Agent": "AC-Nexus/5.0"})
                 urllib.request.urlopen(req, timeout=5, context=ctx)
                 return True
             except Exception:
@@ -164,7 +164,7 @@ def open_repair(app):
                 url = f"https://{base}/v7/weather/now?location={lon},{lat}&key={key}"
                 import gzip
                 ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-                req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC/2.0"})
+                req = urllib.request.Request(url, headers={"User-Agent": "AC-Nexus/2.0"})
                 resp = urllib.request.urlopen(req, timeout=6, context=ctx)
                 raw = resp.read()
                 data = json.loads(gzip.decompress(raw))
@@ -187,7 +187,7 @@ def open_repair(app):
                 lon, lat = _cfg.LOCATION["lon"], _cfg.LOCATION["lat"]
                 url = f"https://api.map.baidu.com/weather/v1/?location={lon},{lat}&coordtype=wgs84&data_type=now&ak={bd_key}"
                 ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-                req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC/2.0"})
+                req = urllib.request.Request(url, headers={"User-Agent": "AC-Nexus/2.0"})
                 resp = urllib.request.urlopen(req, timeout=6, context=ctx)
                 data = json.loads(resp.read())
                 if data.get("status") == 0:

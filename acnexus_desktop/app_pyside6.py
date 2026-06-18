@@ -1,20 +1,20 @@
-"""BroadlinkAC Desktop — PySide6 版本"""
+"""AC-Nexus Desktop — PySide6 版本"""
 
 import sys, platform, threading, os, json
 from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import broadlinkac_core.config as _cfg
-from broadlinkac_core.config import (
+import acnexus_core.config as _cfg
+from acnexus_core.config import (
     get_current_device, get_device_list, switch_device, save_config,
     add_or_update_device,
 )
-from broadlinkac_core.ac_control import send_ac, discover_devices, FANS, MODES
-from broadlinkac_core.scheduler import register_all_jobs
-from broadlinkac_core.weather import fetch_weather, fetch_weather_alerts
-from broadlinkac_core.typhoon import fetch_and_cache, judge_and_shutdown
-from broadlinkac_core.logger import write_log
+from acnexus_core.ac_control import send_ac, discover_devices, FANS, MODES
+from acnexus_core.scheduler import register_all_jobs
+from acnexus_core.weather import fetch_weather, fetch_weather_alerts
+from acnexus_core.typhoon import fetch_and_cache, judge_and_shutdown
+from acnexus_core.logger import write_log
 
 from .pyside.ac_tab import build_ac_tab, update_brand_logo
 from .pyside.ty_tab import (
@@ -27,7 +27,7 @@ from .pyside.dialogs import (
 from .pyside.theme import apply_theme
 from .pyside._utils import lbl
 
-APP_NAME = "BroadlinkAC"
+APP_NAME = "AC-Nexus"
 IS_MAC = platform.system() == "Darwin"
 IS_WIN = platform.system() == "Windows"
 _sched_lock = threading.Lock()
@@ -38,16 +38,17 @@ class App(QtWidgets.QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(APP_NAME + "  v5.1")
+        self.setWindowTitle(APP_NAME + "  v5.2")
         self.resize(865, 780)
         self.setMinimumSize(760, 650)
 
         self._ui_signal.connect(lambda fn: fn())
 
         self._temp_val = 26
+        self._brand_type = _cfg.config.get("current_brand_type", "broadlink")
         self._weather_data = None; self._alerts_data = []; self._alerts_provider = "baidu"
         self._ty_data = []; self._ty_page = 0; self._alert_page = 0
-        self._ty_alert_muted = False; self._ty_ac_off_sent = False
+        self._ty_alert_muted = False
         self._wx_timer_id = None; self._ty_timer_id = None
 
         self._build_menu_bar()
@@ -73,7 +74,8 @@ class App(QtWidgets.QMainWindow):
         update_brand_logo(self)
         self._update_schedule_display()
         threading.Thread(target=self._init_data, daemon=True).start()
-        QtCore.QTimer.singleShot(2000, self._scan_devices)
+        if self._brand_type == "broadlink":
+            QtCore.QTimer.singleShot(2000, self._scan_devices)
         QtCore.QTimer.singleShot(500, self._ty_fetch)
 
     def _ui(self, fn):
@@ -161,16 +163,16 @@ class App(QtWidgets.QMainWindow):
         m = mb.addMenu("帮助")
         m.addAction("使用文档", self._open_docs)
         m.addSeparator()
-        m.addAction("关于 BroadlinkAC", self._show_about)
+        m.addAction("关于 AC-Nexus", self._show_about)
         m.addAction("GitHub 主页", lambda: QtGui.QDesktopServices.openUrl(
-            QtCore.QUrl("https://github.com/oywq00008-cell/BroadlinkAC-For-Agent")))
+            QtCore.QUrl("https://github.com/oywq00008-cell/AC-Nexus-For-Agent")))
 
     def _setup_tray(self):
         if IS_MAC: return
         try:
             import pystray; from PIL import Image
             # Windows 用 ICO（支持透明），其他平台用 PNG
-            asset = "broadlink.ico" if IS_WIN else "broadlink.png"
+            asset = "acnexus.ico" if IS_WIN else "acnexus.png"
             img = Image.open(self._get_asset(asset))
             menu = pystray.Menu(
                 pystray.MenuItem("显示", self._restore_from_tray, default=True),
@@ -248,7 +250,7 @@ class App(QtWidgets.QMainWindow):
     def _do_ty_fetch(self):
         try:
             fetch_and_cache()
-            from broadlinkac_core.typhoon import get_cached
+            from acnexus_core.typhoon import get_cached
             self._ty_data = get_cached()
         except: pass
         self._ui(self._ty_cycle_render)
@@ -256,12 +258,12 @@ class App(QtWidgets.QMainWindow):
     def _ty_cycle_render(self):
         try:
             render_typhoon(self)
-            alerts, self._ty_ac_off_sent = judge_and_shutdown(
-                write_log, self._ty_alert_muted, self._ty_ac_off_sent)
+            alerts = judge_and_shutdown(
+                write_log, self._ty_alert_muted)
             for detail, dist in alerts: self._show_ty_alert(detail, dist)
             # 所有台风离开预警范围后自动解除静音，确保新台风出现时能再次弹窗
             if self._ty_alert_muted:
-                from broadlinkac_core.typhoon import calc_distance
+                from acnexus_core.typhoon import calc_distance
                 alert_km = _cfg.config.get("typhoon_alert_km", 800)
                 any_in_range = False
                 for t in self._ty_data:
@@ -298,16 +300,32 @@ class App(QtWidgets.QMainWindow):
     def _build_device_bar(self):
         """返回 QHBoxLayout，直接铺在主窗口背景上（无独立容器）"""
         layout = QtWidgets.QHBoxLayout()
-        layout.setContentsMargins(12, 4, 12, 4)
-        layout.setSpacing(8)
+        layout.setContentsMargins(6, 4, 12, 4)
+        layout.setSpacing(4)
 
-        # 设备图标 + 标签 + 选择器
-        dev_icon = QtWidgets.QLabel()
-        dev_icon.setPixmap(QtGui.QIcon(self._icon("device.svg")).pixmap(22, 22))
-        layout.addWidget(dev_icon)
-        layout.addWidget(QtWidgets.QLabel("设备:"))
+        # [📡 设备] 按钮 → 打开品牌选择弹窗
+        self._brand_btn = QtWidgets.QPushButton()
+        self._brand_btn.setIcon(QtGui.QIcon(self._icon("device.svg")))
+        self._brand_btn.setIconSize(QtCore.QSize(20, 20))
+        self._brand_btn.setText(" 设备")
+        self._brand_btn.setFixedWidth(68)
+        self._brand_btn.setFixedHeight(28)
+        self._brand_btn.setFlat(True)
+        self._brand_btn.setToolTip("切换设备品牌类型 (博联 / 米家)")
+        self._brand_btn.clicked.connect(self._on_brand_select)
+        self._refresh_brand_btn_style()
+        layout.addWidget(self._brand_btn)
+        layout.addSpacing(2)
+
+        # 品牌 logo（容器和尺寸在 _refresh_brand_ui 中按品牌动态设置）
+        self._brand_logo = QtWidgets.QLabel()
+        self._brand_logo.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(self._brand_logo)
+        layout.addSpacing(6)
+
+        # 设备选择器
         self._dev_combo = QtWidgets.QComboBox()
-        self._dev_combo.setMinimumWidth(180)
+        self._dev_combo.setFixedWidth(190)
         self._dev_combo.setFixedHeight(26)
         self._dev_combo.currentIndexChanged.connect(self._on_device_switch)
         layout.addWidget(self._dev_combo)
@@ -316,7 +334,7 @@ class App(QtWidgets.QMainWindow):
         btn = QtWidgets.QPushButton()
         btn.setIcon(QtGui.QIcon(self._icon("edit.svg")))
         btn.setIconSize(QtCore.QSize(20, 20))
-        btn.setFixedSize(26, 26)
+        btn.setFixedSize(26, 30)
         btn.setFlat(True)
         btn.setToolTip("重命名设备")
         btn.setStyleSheet("""
@@ -329,7 +347,7 @@ class App(QtWidgets.QMainWindow):
         btn = QtWidgets.QPushButton()
         btn.setIcon(QtGui.QIcon(self._icon("delete_black.svg")))
         btn.setIconSize(QtCore.QSize(20, 20))
-        btn.setFixedSize(26, 26)
+        btn.setFixedSize(26, 30)
         btn.setFlat(True)
         btn.setToolTip("删除设备")
         btn.setStyleSheet("""
@@ -339,19 +357,34 @@ class App(QtWidgets.QMainWindow):
         btn.clicked.connect(self._delete_device)
         layout.addWidget(btn, alignment=QtCore.Qt.AlignTop)
 
-        # 扫描按钮（纯图标）
-        scan_btn = QtWidgets.QPushButton()
-        scan_btn.setIcon(QtGui.QIcon(self._icon("scan.svg")))
-        scan_btn.setIconSize(QtCore.QSize(20, 20))
-        scan_btn.setFixedSize(26, 26)
-        scan_btn.setFlat(True)
-        scan_btn.setToolTip("扫描设备")
-        scan_btn.setStyleSheet("""
+        # 扫描按钮（纯图标，仅博联模式显示）
+        self._scan_btn = QtWidgets.QPushButton()
+        self._scan_btn.setIcon(QtGui.QIcon(self._icon("scan.svg")))
+        self._scan_btn.setIconSize(QtCore.QSize(20, 20))
+        self._scan_btn.setFixedSize(26, 30)
+        self._scan_btn.setFlat(True)
+        self._scan_btn.setToolTip("扫描设备")
+        self._scan_btn.setStyleSheet("""
             QPushButton { border:none; background:transparent; }
             QPushButton:hover { background:#E8F0FE; border-radius:4px; }
         """)
-        scan_btn.clicked.connect(self._scan_devices)
-        layout.addWidget(scan_btn, alignment=QtCore.Qt.AlignTop)
+        self._scan_btn.clicked.connect(self._scan_devices)
+        layout.addWidget(self._scan_btn, alignment=QtCore.Qt.AlignTop)
+
+        # 米家 [+] 添加按钮（隐藏）
+        self._add_xiaomi_btn = QtWidgets.QPushButton()
+        self._add_xiaomi_btn.setIcon(QtGui.QIcon(self._icon("add_black.svg")))
+        self._add_xiaomi_btn.setIconSize(QtCore.QSize(20, 20))
+        self._add_xiaomi_btn.setFixedSize(26, 30)
+        self._add_xiaomi_btn.setFlat(True)
+        self._add_xiaomi_btn.setToolTip("添加米家设备")
+        self._add_xiaomi_btn.setStyleSheet("""
+            QPushButton { border:none; background:transparent; }
+            QPushButton:hover { background:#E8F0FE; border-radius:4px; }
+        """)
+        self._add_xiaomi_btn.clicked.connect(self._on_add_xiaomi)
+        self._add_xiaomi_btn.setVisible(False)
+        layout.addWidget(self._add_xiaomi_btn, alignment=QtCore.Qt.AlignTop)
 
         layout.addStretch()
 
@@ -378,13 +411,91 @@ class App(QtWidgets.QMainWindow):
         refresh_btn.clicked.connect(self._refresh_all_data)
         layout.addWidget(refresh_btn)
 
+        # 初始化品牌 UI
+        self._refresh_brand_ui()
+
         return layout
+
+    # ===== 品牌切换 =====
+    def _on_brand_select(self):
+        from .pyside.brand_dialog import open_brand_dialog, BRAND_BROADLINK, BRAND_XIAOMI
+        new_brand = open_brand_dialog(self, self._brand_type)
+        if new_brand is None or new_brand == self._brand_type:
+            return
+        # 保存旧品牌的当前设备状态（用嵌套结构查找）
+        old_device = _cfg.config.get("current_device_mac", "")
+        old_provider = _cfg.config.get("current_brand_type", "broadlink")
+        if old_device and old_device in _cfg.config.get("devices", {}).get(old_provider, {}):
+            from acnexus_core.config import _save_flat_to_device
+            _save_flat_to_device(old_device)
+        # 切换到新品牌
+        self._brand_type = new_brand
+        _cfg.config["current_brand_type"] = new_brand
+        # 找新品牌下的第一个设备
+        devices = get_device_list(brand_type=new_brand)
+        if devices:
+            switch_device(devices[0][0])
+        else:
+            _cfg.config["current_device_mac"] = ""
+        save_config(_cfg.config)
+        self._refresh_device_list()
+        self._refresh_device_ui()
+        self._refresh_brand_ui()
+        # 定时任务由保存/增删/开关触发，切品牌不需要重注册（现在遍历所有 provider）
+        # 首次切到米家且无设备 → 自动弹出添加流程
+        if new_brand == "xiaomi_cloud" and not devices:
+            QtCore.QTimer.singleShot(300, self._on_add_xiaomi)
+
+    def _on_add_xiaomi(self):
+        """米家 [+] 按钮：扫码登录 → 拉设备列表 → 勾选添加"""
+        from .pyside.xiaomi_login_dialog import open_xiaomi_login_dialog
+        from .pyside.xiaomi_device_picker import open_xiaomi_device_picker
+        session = open_xiaomi_login_dialog(self)
+        if session is None:
+            return  # 用户取消
+        # 弹设备选择窗
+        dids = open_xiaomi_device_picker(self, session)
+        if dids:
+            self._refresh_device_list()
+            self._refresh_device_ui()
+            register_all_jobs()
+            self.statusBar().showMessage(f"✅ 已添加 {len(dids)} 个米家设备", 4000)
+
+    def _refresh_brand_ui(self):
+        """更新品牌 logo 和 [+] 按钮可见性"""
+        try:
+            if self._brand_type == "xiaomi_cloud":
+                logo_path = os.path.join(os.path.dirname(__file__), "..", "logos", "mijia_logo.png")
+                w, h = 24, 20
+            else:
+                logo_path = os.path.join(os.path.dirname(__file__), "..", "logos", "Broadlink_logo.png")
+                w, h = 52, 22
+            self._brand_logo.setFixedSize(w, h)
+            pixmap = QtGui.QPixmap(logo_path).scaled(
+                w, h, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+            self._brand_logo.setPixmap(pixmap)
+            self._brand_logo.setContentsMargins(0, -1, 0, 0)
+        except Exception:
+            self._brand_logo.clear()
+        self._add_xiaomi_btn.setVisible(self._brand_type == "xiaomi_cloud")
+        self._scan_btn.setVisible(self._brand_type == "broadlink")
+        self._refresh_brand_btn_style()
+
+    def _refresh_brand_btn_style(self):
+        """更新设备按钮 hover 样式（跟随主题）"""
+        from .pyside._utils import is_dark
+        hover_bg = "#3A3A3A" if is_dark() else "#E8F0FE"
+        self._brand_btn.setStyleSheet(f"""
+            QPushButton {{ border:none; background:transparent; font-size:14px; font-weight:bold; padding: 2px 8px; }}
+            QPushButton:hover {{ background:{hover_bg}; border-radius:6px; }}
+        """)
 
     def _refresh_all_data(self):
         """一键刷新：天气 + 设备 + 台风"""
         self._update_time_lbl.setText("最后更新：⏳...")
         self._fetch_weather_all()
-        self._scan_devices()
+        if self._brand_type == "broadlink":
+            self._scan_devices()
         self._ty_fetch()
         self._ui(lambda: self._update_time_lbl.setText(
             f"最后更新：{__import__('datetime').datetime.now().strftime('%H:%M')}"))
@@ -442,7 +553,7 @@ class App(QtWidgets.QMainWindow):
         status_label.setProperty("status_label_kind", "ok")
         self._status_label = status_label
         sb.addWidget(status_label)
-        self._version_label = QtWidgets.QLabel("当前版本：v5.1")
+        self._version_label = QtWidgets.QLabel("当前版本：v5.2")
         self._version_label.setStyleSheet("color:#999;")
         self._version_label.setProperty("status_label_kind", "version")
         sb.addPermanentWidget(self._version_label)
@@ -497,7 +608,7 @@ class App(QtWidgets.QMainWindow):
 
     # ===== 规则 =====
     def _refresh_rules_display(self):
-        from broadlinkac_core.ac_control import MODE_KEYS
+        from acnexus_core.ac_control import MODE_KEYS
         rules = _cfg.config.get("temp_rules", [
             [36,99,24,"cool"],[33,35,25,"cool"],[30,32,26,"cool"],
             [25,29,27,"cool"],[18,24,0,"off"],[0,17,28,"heat"]
@@ -519,18 +630,40 @@ class App(QtWidgets.QMainWindow):
     # ===== 设备管理 =====
     def _refresh_device_list(self):
         self._dev_combo.blockSignals(True); self._dev_combo.clear()
-        for mac, name in get_device_list():
-            label = name + (" (离线)" if _cfg._online_macs and mac not in _cfg._online_macs else "")
+        provider = self._brand_type
+        for mac, name in get_device_list(brand_type=provider):
+            dev = _cfg.config.get("devices", {}).get(provider, {}).get(mac, {})
+            model = dev.get("model", "")
+            parts = [name]
+            if model and model != name:
+                parts.append(f"({model})")
+            if provider == "broadlink" and _cfg._online_macs and mac not in _cfg._online_macs:
+                parts.append("(离线)")
+            label = " ".join(parts)
             self._dev_combo.addItem(label, userData=mac)
+        # 选取当前设备
         cur = _cfg.config.get("current_device_mac","")
+        chosen_idx = -1
         for i in range(self._dev_combo.count()):
-            if self._dev_combo.itemData(i) == cur: self._dev_combo.setCurrentIndex(i); break
+            if self._dev_combo.itemData(i) == cur:
+                chosen_idx = i; break
+        if chosen_idx < 0 and self._dev_combo.count() > 0:
+            # 当前设备不在过滤结果中（品牌不匹配），取第一个
+            chosen_idx = 0
+            first_mac = self._dev_combo.itemData(0)
+            _cfg.config["current_device_mac"] = first_mac
+            from acnexus_core.config import _load_device_to_flat
+            _load_device_to_flat(first_mac)
+            save_config(_cfg.config)
+        if chosen_idx >= 0:
+            self._dev_combo.setCurrentIndex(chosen_idx)
         self._dev_combo.blockSignals(False)
 
     def _on_device_switch(self, idx):
         if idx < 0: return
         mac = self._dev_combo.itemData(idx)
-        if mac and hasattr(self, '_ctrl_title'):
+        if not mac: return
+        if hasattr(self, '_ctrl_title'):
             switch_device(mac); save_config(_cfg.config); self._refresh_device_ui()
             dev = get_current_device()
             write_log("系统", f"切换设备 → {dev.get('name', mac[:8])}")
@@ -541,8 +674,13 @@ class App(QtWidgets.QMainWindow):
         self._fan_cb.setCurrentText({v:k for k,v in FANS.items()}.get(dev.get("fan","auto"),"自动"))
         self._adjust_sw.setChecked(dev.get("auto_adjust",True))
         self._update_schedule_display()
+        self._refresh_rules_display()
+        if hasattr(self, '_refresh_tmpl_cb'):
+            self._refresh_tmpl_cb()
 
     def _scan_devices(self):
+        if self._brand_type != "broadlink":
+            return
         self._conn_status.setText("● 扫描中")
         self._conn_status.setStyleSheet(
             "QLabel { color:#E67E22; font-weight:medium; border:1px solid #E67E22; border-radius:8px; padding:0px 8px; font-size:13px; max-height:17px; }")
@@ -576,7 +714,8 @@ class App(QtWidgets.QMainWindow):
                 "port": d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80,
                 "mac": mac, "model": d.model, "name": d.model or d.name,
             })
-        save_config(_cfg.config)
+        # sync_device=False 避免 config 根级脏扁平键覆写新建设备的正确属性
+        save_config(_cfg.config, sync_device=False)
         _cfg._online_macs = online
         count = len(devices)
         write_log("系统", f"设备扫描完成: 发现 {count} 个设备")
@@ -595,23 +734,31 @@ class App(QtWidgets.QMainWindow):
         from .pyside.dialogs import open_rename_device
         new_name = open_rename_device(self, old, mac)
         if new_name and new_name != old:
-            _cfg.config.setdefault("devices",{}).setdefault(mac,{})["name"] = new_name
+            _cfg.config.setdefault("devices",{}).setdefault(self._brand_type,{}).setdefault(mac,{})["name"] = new_name
             _cfg.config["name"] = new_name; save_config(_cfg.config); self._refresh_device_list()
             write_log("系统", f"设备重命名: {old} → {new_name}")
 
     def _delete_device(self):
         mac=_cfg.config.get("current_device_mac","")
-        devs=_cfg.config.get("devices",{})
-        name = devs.get(mac,{}).get('name', mac[:8])
-        if not mac or len(devs)<=1:
-            from .pyside.dialogs import open_delete_device
-            open_delete_device(self, allow=False); return
+        devs=_cfg.config.get("devices",{}).get(self._brand_type, {})
+        if not mac or not devs:
+            return  # 无设备或未选中，静默忽略
+        dev = devs.get(mac,{})
+        name = dev.get('name', mac[:8])
+        model = dev.get('model', '')
+        confirm_label = f"「{name}」" + (f" ({model})" if model else "")
         from .pyside.dialogs import open_delete_device
-        if open_delete_device(self, name=name):
-            del devs[mac]; _cfg.config["current_device_mac"]=next(iter(devs))
-            switch_device(_cfg.config["current_device_mac"]); save_config(_cfg.config)
+        if open_delete_device(self, name=confirm_label):
+            del devs[mac]
+            if not devs:
+                _cfg.config["current_device_mac"] = ""
+            else:
+                fallback = next(iter(devs))
+                _cfg.config["current_device_mac"] = fallback
+                switch_device(fallback)
+            save_config(_cfg.config)
             self._refresh_device_list(); self._refresh_device_ui(); register_all_jobs()
-            write_log("系统", f"已删除设备: {name}")
+            write_log("系统", f"已删除设备: {confirm_label}")
 
     # ===== 台风/预警 UI 更新 =====
     def _update_alert_source(self):
@@ -677,13 +824,13 @@ class App(QtWidgets.QMainWindow):
 
 
 def main():
-    from broadlinkac_core import init; init()
+    from acnexus_core import init; init()
     app = QtWidgets.QApplication(sys.argv); app.setApplicationName(APP_NAME)
     app.setStyle("Fusion")
     # 设置窗口/任务栏图标
-    ico_path = Path(__file__).resolve().parent.parent / "broadlink.ico"
+    ico_path = Path(__file__).resolve().parent.parent / "acnexus.ico"
     if not ico_path.exists():
-        ico_path = Path(sys._MEIPASS) / "broadlink.ico"
+        ico_path = Path(sys._MEIPASS) / "acnexus.ico"
     if ico_path.exists():
         app.setWindowIcon(QtGui.QIcon(str(ico_path)))
     # 加载内置字体

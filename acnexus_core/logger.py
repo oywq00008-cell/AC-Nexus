@@ -1,9 +1,9 @@
-"""BroadlinkAC Core — 日志"""
+"""AC-Nexus Core — 日志"""
 
 import re
 import threading
 from datetime import datetime, timedelta
-from broadlinkac_core.config import LOG_DIR
+from acnexus_core.config import LOG_DIR
 
 _log_lock = threading.Lock()
 

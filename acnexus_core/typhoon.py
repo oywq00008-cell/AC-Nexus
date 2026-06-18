@@ -1,4 +1,4 @@
-"""BroadlinkAC Core — 风暴监测"""
+"""AC-Nexus Core — 风暴监测"""
 
 import json
 import math
@@ -18,7 +18,7 @@ def _urlopen(url, timeout=8):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC/2.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "AC-Nexus/2.0"})
     return urllib.request.urlopen(req, timeout=timeout, context=ctx)
 
 
@@ -118,7 +118,7 @@ def typhoon_threat_distance(provider=None):
     provider 不传则走 config 当前设置。
     任何异常均返回 (99999, "")，不抛异常。
     """
-    import broadlinkac_core.config as _cfg
+    import acnexus_core.config as _cfg
     try:
         provider = provider or _cfg.config.get("typhoon_provider", "nmc")
         lat = _cfg.LOCATION["lat"]
@@ -240,7 +240,7 @@ _ty_cache = []
 def fetch_and_cache():
     global _ty_cache
     try:
-        import broadlinkac_core.config as _cfg
+        import acnexus_core.config as _cfg
         provider = _cfg.config.get("typhoon_provider", "nmc")
         _ty_cache = []
         if provider == "nhc":
@@ -263,10 +263,10 @@ def get_cached():
     return _ty_cache
 
 
-def judge_and_shutdown(write_log_func, ty_alert_muted=False, ty_ac_off_sent=False):
+def judge_and_shutdown(write_log_func, ty_alert_muted=False):
     alerts = []
     min_dist = 99999
-    import broadlinkac_core.config as _cfg
+    import acnexus_core.config as _cfg
 
     alert_km = _cfg.config.get("typhoon_alert_km", 800)
     alert_enabled = _cfg.config.get("typhoon_alert_enabled", True)
@@ -286,25 +286,35 @@ def judge_and_shutdown(write_log_func, ty_alert_muted=False, ty_ac_off_sent=Fals
         if dist < alert_km and alert_enabled and not ty_alert_muted:
             alerts.append((detail, dist))
 
-    if ac_off_enabled and min_dist < 100 and not ty_ac_off_sent:
-        ty_ac_off_sent = True
-        from broadlinkac_core.ac_control import send_ac
-        devices = _cfg.config.get("devices", {})
+    if ac_off_enabled and min_dist < 100:
+        from acnexus_core.ac_control import send_ac
+        from acnexus_core.scheduler import pause_scheduler
+        pause_scheduler()
+        # 台风关机对所有品牌所有设备生效
         offline_count = off_count = 0
-        for mac, dev in devices.items():
-            name = dev.get("name", mac[:8])
-            online = not _cfg._online_macs or mac in _cfg._online_macs
-            if not online:
-                offline_count += 1
+        for provider, devs in _cfg.config.get("devices", {}).items():
+            if not isinstance(devs, dict):
                 continue
-            try:
-                send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
-                write_log_func("空调", f"[{datetime.now():%H:%M}] 台风靠近（距{min_dist}km）→ [{name}] 已自动关机")
-                off_count += 1
-            except Exception as e:
-                write_log_func("系统", f"台风关机失败 [{name}]: {e}")
+            for mac, dev in devs.items():
+                name = dev.get("name", mac[:8])
+                # MIoT 设备不依赖局域网扫描，始终视为在线
+                if provider == "xiaomi_cloud":
+                    online = True
+                else:
+                    online = not _cfg._online_macs or mac in _cfg._online_macs
+                if not online:
+                    offline_count += 1
+                    continue
+                try:
+                    send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
+                    write_log_func("空调", f"[{datetime.now():%H:%M}] 台风靠近（距{min_dist}km）→ [{name}] 已自动关机")
+                    off_count += 1
+                except Exception as e:
+                    write_log_func("系统", f"台风关机失败 [{name}]: {e}")
         write_log_func("系统", f"[{datetime.now():%H:%M}] 台风自动关机完成: 关闭 {off_count} 台, 离线 {offline_count} 台")
-    elif min_dist >= 100:
-        ty_ac_off_sent = False
+    else:
+        # 开关关闭 或 风暴远离 → 恢复调度器正常运作
+        from acnexus_core.scheduler import resume_scheduler
+        resume_scheduler()
 
-    return alerts, ty_ac_off_sent
+    return alerts

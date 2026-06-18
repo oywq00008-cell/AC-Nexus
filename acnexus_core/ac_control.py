@@ -1,4 +1,4 @@
-"""BroadlinkAC Core — 空调控制（博联设备 + 红外发码 + 温度规则）"""
+"""AC-Nexus Core — 空调控制（博联设备 + 红外发码 + 温度规则）"""
 
 import socket
 from datetime import datetime
@@ -6,8 +6,8 @@ from datetime import datetime
 import broadlink
 from broadlink.remote import pulses_to_data
 
-import broadlinkac_core.config as _cfg
-from broadlinkac_core.logger import write_log
+import acnexus_core.config as _cfg
+from acnexus_core.logger import write_log
 
 
 # UI 显示用
@@ -56,7 +56,8 @@ def discover_devices(timeout=5):
 
 def get_device(mac=None):
     """获取博联设备：优先从 config 读 host 直连，失败扫描"""
-    devs = _cfg.config.get("devices", {})
+    provider = _cfg.config.get("current_brand_type", "broadlink")
+    devs = _cfg.config.get("devices", {}).get(provider, {})
     if not mac:
         mac = _cfg.config.get("current_device_mac", "")
     dev = devs.get(mac, {})
@@ -95,14 +96,33 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
        mac: 设备 MAC，不传则用当前选中设备"""
     if not mac:
         mac = _cfg.config.get("current_device_mac", "")
-    dev = _cfg.config.get("devices", {}).get(mac, {})
+        provider = _cfg.config.get("current_brand_type", "broadlink")
+        dev = _cfg.config.get("devices", {}).get(provider, {}).get(mac, {})
+    else:
+        provider, dev = _cfg.find_device(mac)
     raw_brand = dev.get("brand", "格力")
     brand = _cfg.resolve_brand(raw_brand)
     t = min(max(temp, 16), 30)
 
+    # ── 米家 MIoT 局域网分支 ──
+    if provider == "xiaomi_cloud":
+        from acnexus_core.xiaomi_local import build_miot_cmds, send_miot
+        model = dev.get("model", "")
+        token = dev.get("token", "")
+        host = dev.get("host", "")
+        if not host or not token:
+            raise Exception(f"米家设备缺少 host/token: host={host} token={bool(token)}")
+        cmds = build_miot_cmds(power, mode, t, fan, model)
+        send_miot(host, token, cmds)
+        now = datetime.now()
+        label = {"手动": "手动", "定时": "定时", "自动": "自动调温"}.get(source, source)
+        if power == "on":
+            return f"[{now:%H:%M}] {label}开机 → {MODE_KEYS.get(mode, mode)} {temp}°C"
+        return f"[{now:%H:%M}] {label}关机"
+
     # ── 自定义品牌：用 ir_learner 生成 raw hex 发送 ──
     if raw_brand != "格力" and raw_brand not in _cfg.AC_BRANDS:
-        from broadlinkac_core.ir_learner import get_raw_code
+        from acnexus_core.ir_learner import get_raw_code
         raw_hex = get_raw_code(raw_brand, power, mode, t, fan)
         if raw_hex:
             d = get_device(mac)
@@ -168,7 +188,10 @@ def decide_ac(outdoor, mac=None):
     """根据室外温度 + 当前设备规则，返回 (目标温度, 模式)"""
     if not mac:
         mac = _cfg.config.get("current_device_mac", "")
-    dev = _cfg.config.get("devices", {}).get(mac, {})
+        provider = _cfg.config.get("current_brand_type", "broadlink")
+        dev = _cfg.config.get("devices", {}).get(provider, {}).get(mac, {})
+    else:
+        provider, dev = _cfg.find_device(mac)
     rules = dev.get("temp_rules", [])
     if not rules:
         return 26, "cool"

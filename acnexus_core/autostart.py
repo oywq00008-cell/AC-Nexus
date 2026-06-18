@@ -3,7 +3,7 @@ import sys
 import os
 from pathlib import Path
 
-STARTUP_NAME = "BroadlinkAC"
+STARTUP_NAME = "AC-Nexus"
 
 
 def _get_startup_path():

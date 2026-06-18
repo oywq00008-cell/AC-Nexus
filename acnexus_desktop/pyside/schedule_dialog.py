@@ -1,17 +1,17 @@
 """定时模板编辑 — 摘要数据 + 多日期组模板管理对话框"""
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
-import broadlinkac_core.config as _cfg
-from broadlinkac_core.config import save_config
-from broadlinkac_core.logger import write_log
+import acnexus_core.config as _cfg
+from acnexus_core.config import save_config
+from acnexus_core.logger import write_log
 
 # _make_dialog/_dialog_content 定义在 dialogs.py 顶层，
 # 此处为循环导入，满足两点即可安全：
 # 1. dialogs.py 中这些函数定义在所有 import schedule_dialog 之前
 # 2. 不在模块顶层调用，仅函数内使用
 from .dialogs import _make_dialog, _dialog_content
-from ._utils import lbl
+from ._utils import lbl, is_dark
 
 _WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
@@ -21,7 +21,8 @@ def _schedule_summary(app):
     返回: {"name": str, "groups": [{"days_str": str, "times": [str, ...]}, ...]}，错误时含 "error" 键
     """
     mac = _cfg.config.get("current_device_mac", "")
-    dev = _cfg.config.get("devices", {}).get(mac, {})
+    provider = _cfg.config.get("current_brand_type", "broadlink")
+    dev = _cfg.config.get("devices", {}).get(provider, {}).get(mac, {})
     tmpl_name = dev.get("active_template")
     enabled = dev.get("schedule_enabled", True)
     if not enabled or not tmpl_name:
@@ -56,15 +57,42 @@ def _schedule_summary(app):
 def open_schedule_template(app):
     """定时模板编辑弹窗 — 支持多日期组"""
     mac = _cfg.config.get("current_device_mac", "")
-    dev = _cfg.config.setdefault("devices", {}).setdefault(mac, {})
+    provider = _cfg.config.get("current_brand_type", "broadlink")
+    dev = _cfg.config.setdefault("devices", {}).setdefault(provider, {}).setdefault(mac, {})
     templates = _cfg.config.setdefault("schedule_templates", {})
     if not templates:
         templates["默认"] = {"groups": [{"days": [1,2,3,4,5], "slots": []}]}
     active = dev.get("active_template", list(templates.keys())[0] if templates else "")
 
-    dlg = _make_dialog(app, "定时模板编辑", 460, 520, frameless=True)
-    layout, swl = _dialog_content(dlg, frameless=True)
+    dlg = _make_dialog(app, "定时模板编辑", 500, 560)
+    layout, swl = _dialog_content(dlg, title="定时模板编辑", bg_override="#383838")
+    # 阴影
+    outer = dlg.findChild(QtWidgets.QFrame)
+    if outer:
+        outer.setObjectName("schedule_outer")
+        from ._utils import is_dark
+        _dark2 = is_dark()
+        _bg = "#383838" if _dark2 else "white"
+        _bd = "#444" if _dark2 else "#DEDEDE"
+        outer.setStyleSheet(f"QFrame#schedule_outer {{ background:{_bg}; border:1px solid {_bd}; border-radius:12px; }}")
+        tb = outer.findChild(QtWidgets.QWidget)
+        if tb:
+            tb.setStyleSheet(f"background: transparent; border-bottom: 1px solid {_bd};")
+            def _on_press(e):
+                if e.button() == QtCore.Qt.LeftButton:
+                    tb._drag_start = e.globalPosition().toPoint() - dlg.frameGeometry().topLeft()
+            def _on_move(e):
+                if hasattr(tb, '_drag_start'):
+                    dlg.move(e.globalPosition().toPoint() - tb._drag_start)
+            tb.mousePressEvent = _on_press
+            tb.mouseMoveEvent = _on_move
+        shadow = QtWidgets.QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setOffset(0, 0)
+        shadow.setColor(QtGui.QColor(0, 0, 0, 100))
+        outer.setGraphicsEffect(shadow)
     swl.setSpacing(8)
+    dlg.layout().setContentsMargins(10, 10, 10, 10)
 
     # ── 模板选择行 ──
     tr = QtWidgets.QWidget()
@@ -98,9 +126,12 @@ def open_schedule_template(app):
         name, ok = QtWidgets.QInputDialog.getText(dlg, "重命名模板", "新名称:", text=old)
         if ok and name.strip() and name.strip() != old and name.strip() not in templates:
             templates[name.strip()] = templates.pop(old)
-            for d in _cfg.config.get("devices", {}).values():
-                if d.get("active_template") == old:
-                    d["active_template"] = name.strip()
+            for provider_devs in _cfg.config.get("devices", {}).values():
+                if not isinstance(provider_devs, dict):
+                    continue
+                for d in provider_devs.values():
+                    if d.get("active_template") == old:
+                        d["active_template"] = name.strip()
             _refresh_tmpl_list(); tmpl_cb.setCurrentText(name.strip())
             write_log("定时", f"模板重命名: {old} → {name.strip()}")
     btn = QtWidgets.QPushButton("✎"); btn.setFixedSize(30, 26)
@@ -115,13 +146,16 @@ def open_schedule_template(app):
         if QtWidgets.QMessageBox.question(dlg, "删除", f"确定删除「{name}」？") != QtWidgets.QMessageBox.Yes:
             return
         del templates[name]
-        for dmac, d in _cfg.config.get("devices", {}).items():
-            if d.get("active_template") == name:
-                if dmac == mac:
-                    d.pop("active_template", None)
-                else:
-                    d.pop("active_template", None)
-                    d["schedule_enabled"] = False
+        for provider, provider_devs in _cfg.config.get("devices", {}).items():
+            if not isinstance(provider_devs, dict):
+                continue
+            for dmac, d in provider_devs.items():
+                if d.get("active_template") == name:
+                    if dmac == mac and provider == _cfg.config.get("current_brand_type"):
+                        d.pop("active_template", None)
+                    else:
+                        d.pop("active_template", None)
+                        d["schedule_enabled"] = False
         _refresh_tmpl_list(); _rebuild_all()
         write_log("定时", f"已删除模板: {name}")
     btn = QtWidgets.QPushButton("🗑"); btn.setFixedSize(30, 26)
@@ -143,16 +177,21 @@ def open_schedule_template(app):
         slots = slots if isinstance(slots, list) else []
 
         frame = QtWidgets.QFrame()
-        frame.setStyleSheet("QFrame { background:#F8FAFC; border:1px solid #DEDEDE; border-radius:8px; }")
+        frame.setObjectName("date_group_card")
+        dark = is_dark()
+        _bg = "#383838" if dark else "white"
+        _label_color = "#CCC" if dark else "#555"
+        frame.setStyleSheet(f"QFrame#date_group_card {{ background:{_bg}; border:2px solid {'#3A7BD5' if dark else '#B3D4FF'}; border-radius:8px; }}")
         fl = QtWidgets.QVBoxLayout(frame); fl.setContentsMargins(10, 8, 10, 8); fl.setSpacing(6)
 
         # 组标题
         header = QtWidgets.QWidget()
         hl = QtWidgets.QHBoxLayout(header); hl.setContentsMargins(0, 0, 0, 0)
-        hl.addWidget(lbl(f"日期组 {grp_idx + 1}", bold=True, size=11, color="#555"))
+        hl.addWidget(lbl(f"日期组 {grp_idx + 1}", bold=True, size=11, color=_label_color))
         hl.addStretch()
         del_btn = QtWidgets.QPushButton("✕ 删除此组")
-        del_btn.setStyleSheet("QPushButton { border:none; color:#E74C3C; font-size:11px; } QPushButton:hover { text-decoration:underline; }")
+        _del_color = "#FF6B6B" if dark else "#E74C3C"
+        del_btn.setStyleSheet(f"QPushButton {{ border:none; color:{_del_color}; font-size:11px; }} QPushButton:hover {{ text-decoration:underline; }}")
         hl.addWidget(del_btn)
         fl.addWidget(header)
 
@@ -162,6 +201,8 @@ def open_schedule_template(app):
         dwl = QtWidgets.QHBoxLayout(dw); dwl.setContentsMargins(0, 0, 0, 0); dwl.setSpacing(2)
         for i, name in enumerate(_WEEKDAYS):
             cb = QtWidgets.QCheckBox(name)
+            _cb_color = "#EEE" if dark else "#333"
+            cb.setStyleSheet(f"QCheckBox {{ color:{_cb_color}; spacing:4px; }}")
             cb.setChecked((i+1) in days)
             dwl.addWidget(cb); day_checks.append(cb)
         dwl.addStretch()
@@ -174,31 +215,38 @@ def open_schedule_template(app):
         frame._slot_layout = slot_layout  # 供 _save 读取（Python 原生属性）
 
         def _rebuild_group_slots():
-            sl = slots  # 直接使用闭包列表引用
+            sl = slots
             while slot_layout.count():
                 w = slot_layout.takeAt(0).widget()
-                if w: w.deleteLater()
+                if w:
+                    w.hide()
+                    w.setParent(None)  # 立即释放，不等 deleteLater
             for si, slot in enumerate(sl):
                 # 时段行
                 row = QtWidgets.QWidget()
                 rl = QtWidgets.QHBoxLayout(row); rl.setContentsMargins(0, 2, 0, 2); rl.setSpacing(4)
                 on_chk = QtWidgets.QCheckBox("开机")
+                _chk_fg = "#EEE" if dark else "#333"
+                on_chk.setStyleSheet(f"QCheckBox {{ color:{_chk_fg}; }}")
                 on_chk.setChecked(slot.get("on_enabled", True))
                 rl.addWidget(on_chk)
                 on_h, on_m = slot["on"].split(":") if ":" in slot["on"] else ("08", "00")
                 on_h_cb = QtWidgets.QComboBox(); on_h_cb.addItems(_HOURS); on_h_cb.setCurrentText(on_h); on_h_cb.setFixedWidth(50)
                 rl.addWidget(on_h_cb)
-                rl.addWidget(QtWidgets.QLabel(":"))
+                colon_on = QtWidgets.QLabel(":"); colon_on.setStyleSheet(f"color:{_chk_fg};")
+                rl.addWidget(colon_on)
                 on_m_cb = QtWidgets.QComboBox(); on_m_cb.addItems(_MINS); on_m_cb.setCurrentText(on_m); on_m_cb.setFixedWidth(50)
                 rl.addWidget(on_m_cb)
                 rl.addSpacing(12)
                 off_chk = QtWidgets.QCheckBox("关机")
+                off_chk.setStyleSheet(f"QCheckBox {{ color:{_chk_fg}; }}")
                 off_chk.setChecked(slot.get("off_enabled", True) and bool(slot.get("off")))
                 rl.addWidget(off_chk)
                 off_h, off_m = (slot["off"].split(":") if slot.get("off") and ":" in slot["off"] else ("18", "00"))
                 off_h_cb = QtWidgets.QComboBox(); off_h_cb.addItems(_HOURS); off_h_cb.setCurrentText(off_h); off_h_cb.setFixedWidth(50)
                 rl.addWidget(off_h_cb)
-                rl.addWidget(QtWidgets.QLabel(":"))
+                colon_off = QtWidgets.QLabel(":"); colon_off.setStyleSheet(f"color:{_chk_fg};")
+                rl.addWidget(colon_off)
                 off_m_cb = QtWidgets.QComboBox(); off_m_cb.addItems(_MINS); off_m_cb.setCurrentText(off_m); off_m_cb.setFixedWidth(50)
                 rl.addWidget(off_m_cb)
                 rl.addStretch()
@@ -209,21 +257,31 @@ def open_schedule_template(app):
                             if 0 <= j < len(slots): del slots[j]
                             break
                     _rebuild_group_slots()
+                    frame.updateGeometry()
                 del_s_btn = QtWidgets.QPushButton("×")
                 del_s_btn.setFixedSize(22, 22)
-                del_s_btn.setStyleSheet("QPushButton { border:1px solid #CCC; border-radius:3px; color:#999; } QPushButton:hover { background:#EEE; }")
+                _ds_bd = "#555" if dark else "#CCC"
+                _ds_fg = "#AAA" if dark else "#999"
+                _ds_hv = "#444" if dark else "#EEE"
+                del_s_btn.setStyleSheet(f"QPushButton {{ border:1px solid {_ds_bd}; border-radius:3px; color:{_ds_fg}; }} QPushButton:hover {{ background:{_ds_hv}; }}")
                 del_s_btn.clicked.connect(lambda checked=False: _del_grp_slot())
                 rl.addWidget(del_s_btn)
                 slot_layout.addWidget(row)
+            slot_layout.activate()
+            slot_list.adjustSize()
+            frame.adjustSize()
         _rebuild_group_slots()
         fl.addWidget(slot_list)
 
         # 添加时段按钮
         add_s_btn = QtWidgets.QPushButton("+ 添加时段")
-        add_s_btn.setStyleSheet("QPushButton { border:1px dashed #CCC; border-radius:4px; color:#888; background:transparent; padding:2px; } QPushButton:hover { border-color:#2F80ED; color:#2F80ED; }")
+        _asb_bd = "#555" if dark else "#CCC"
+        _asb_fg = "#AAA" if dark else "#888"
+        add_s_btn.setStyleSheet(f"QPushButton {{ border:1px dashed {_asb_bd}; border-radius:4px; color:{_asb_fg}; background:transparent; padding:2px; }} QPushButton:hover {{ border-color:#2F80ED; color:#2F80ED; }}")
         def _add_grp_slot_clicked():
             slots.append({"on": "08:00", "on_enabled": True, "off": "18:00", "off_enabled": True})
             _rebuild_group_slots()
+            frame.updateGeometry()
         add_s_btn.clicked.connect(_add_grp_slot_clicked)
         fl.addWidget(add_s_btn)
 
@@ -235,6 +293,8 @@ def open_schedule_template(app):
         del_btn.clicked.connect(lambda checked=False, w=frame: _del_group(w))
 
         groups_layout.addWidget(frame)
+        frame.updateGeometry()
+        groups_widget.updateGeometry()
 
     def _rebuild_all():
         while groups_layout.count():
@@ -307,8 +367,8 @@ def open_schedule_template(app):
         dev["schedule_enabled"] = True
         _cfg.config["schedule_enabled"] = True
         save_config(_cfg.config)
-        from broadlinkac_core.scheduler import register_all_jobs
-        with __import__("broadlinkac_core.scheduler", fromlist=["_sched_lock"])._sched_lock:
+        from acnexus_core.scheduler import register_all_jobs
+        with __import__("acnexus_core.scheduler", fromlist=["_sched_lock"])._sched_lock:
             register_all_jobs()
         app._ui(lambda: app._update_schedule_display())
         write_log("定时", f"已保存模板: {name}")

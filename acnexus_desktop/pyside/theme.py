@@ -4,7 +4,7 @@ import sys
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import broadlinkac_core.config as _cfg
+import acnexus_core.config as _cfg
 
 
 # ── 深色/浅色调色板 ──
@@ -90,10 +90,10 @@ def apply_theme(mode=None):
             elif obj == "sched_summary_box":
                 bg = "#2D2D2D" if dark else "white"
                 bd = "#444" if dark else "#DEDEDE"
-                widget.setStyleSheet(f"QFrame#sched_summary_box {{ background:{bg}; border:1px solid {bd}; border-radius:8px; }} QFrame#sched_summary_box QWidget {{ background-color:transparent; }}")
+                widget.setStyleSheet(f"QFrame#sched_summary_box {{ background:{bg}; border:1px solid {bd}; border-radius:8px; }}")
                 # 内部内容动态渲染，触发重建以适配分隔线颜色
                 from .ac_tab import _update_schedule_display
-                _update_schedule_display(app)
+                _update_schedule_display(app, dark=dark)
             elif obj in ("ty_grp1", "ty_grp2"):
                 bg = "#2D2D2D" if dark else "white"
                 bd = "#444" if dark else "#DEDEDE"
@@ -136,6 +136,12 @@ def apply_theme(mode=None):
     # 刷新所有文字标签颜色
     from ._utils import refresh_labels
     refresh_labels(app)
+    # 刷新设备按钮 hover 样式
+    from ..app_pyside6 import App
+    for w in app.topLevelWidgets():
+        if isinstance(w, App) and hasattr(w, '_refresh_brand_btn_style'):
+            w._refresh_brand_btn_style()
+            break
 
 
 def _set_global_qss(app, dark):

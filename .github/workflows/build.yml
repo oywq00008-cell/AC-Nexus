@@ -22,11 +22,11 @@ jobs:
         with: { python-version: '3.11' }
       - run: |
           pip install -r requirements.txt pyinstaller
-          pyinstaller --clean --noconfirm BroadlinkAC-linux.spec
+          pyinstaller --clean --noconfirm AC-Nexus-linux.spec
           cp 打不开请看我.txt dist/
-          cd dist && tar czf ../BroadlinkAC-linux.tar.gz BroadlinkAC 打不开请看我.txt
+          cd dist && tar czf ../AC-Nexus-linux.tar.gz AC-Nexus 打不开请看我.txt
       - uses: actions/upload-artifact@v4
-        with: { name: BroadlinkAC-linux, path: BroadlinkAC-linux.tar.gz }
+        with: { name: AC-Nexus-linux, path: AC-Nexus-linux.tar.gz }
 
   # ── Windows ──
   build-windows:
@@ -37,11 +37,11 @@ jobs:
         with: { python-version: '3.11' }
       - run: |
           pip install -r requirements.txt pyinstaller
-          pyinstaller --clean --noconfirm BroadlinkAC.spec
+          pyinstaller --clean --noconfirm AC-Nexus.spec
           cp 打不开请看我.txt dist/
-          Compress-Archive -Path dist/BroadlinkAC.exe,dist/打不开请看我.txt -DestinationPath BroadlinkAC-Windows.zip
+          Compress-Archive -Path dist/AC-Nexus.exe,dist/打不开请看我.txt -DestinationPath AC-Nexus-Windows.zip
       - uses: actions/upload-artifact@v4
-        with: { name: BroadlinkAC-Windows, path: BroadlinkAC-Windows.zip }
+        with: { name: AC-Nexus-Windows, path: AC-Nexus-Windows.zip }
 
   # ── macOS ──
   build-macos:
@@ -52,11 +52,11 @@ jobs:
         with: { python-version: '3.11' }
       - run: |
           pip install -r requirements.txt pyinstaller
-          pyinstaller --clean --noconfirm BroadlinkAC-macOS.spec
+          pyinstaller --clean --noconfirm AC-Nexus-macOS.spec
           cp 打不开请看我.txt dist/
-          cd dist && zip -ry ../BroadlinkAC-macOS.zip BroadlinkAC.app 打不开请看我.txt
+          cd dist && zip -ry ../AC-Nexus-macOS.zip AC-Nexus.app 打不开请看我.txt
       - uses: actions/upload-artifact@v4
-        with: { name: BroadlinkAC-macOS, path: BroadlinkAC-macOS.zip }
+        with: { name: AC-Nexus-macOS, path: AC-Nexus-macOS.zip }
 
   # ── Release ──
   release:
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-        with: { pattern: 'BroadlinkAC-*', merge-multiple: true, path: artifacts }
+        with: { pattern: 'AC-Nexus-*', merge-multiple: true, path: artifacts }
       - run: ls -lh artifacts/
       - uses: softprops/action-gh-release@v2
         with:

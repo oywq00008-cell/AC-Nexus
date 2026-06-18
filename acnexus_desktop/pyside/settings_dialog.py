@@ -10,10 +10,10 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6 import QtSvg
 
-import broadlinkac_core.config as _cfg
-from broadlinkac_core.config import save_config, apply_config, AC_BRANDS
-from broadlinkac_core.logger import write_log
-from broadlinkac_core import autostart as _autostart
+import acnexus_core.config as _cfg
+from acnexus_core.config import save_config, apply_config, AC_BRANDS
+from acnexus_core.logger import write_log
+from acnexus_core import autostart as _autostart
 
 from .theme import apply_theme, _is_system_dark
 from ._utils import lbl, is_dark as _is_dark
@@ -24,7 +24,7 @@ from ._utils import lbl, is_dark as _is_dark
 def _do_learn_wizard(settings_dlg, cb):
     """模块级函数：从设置弹窗中启动学习向导"""
     from .learn_dialog import NewRemoteDialog, LearnWizard
-    from broadlinkac_core.ir_learner import list_custom
+    from acnexus_core.ir_learner import list_custom
 
     new_dlg = NewRemoteDialog(settings_dlg)
     result = new_dlg.exec()
@@ -37,7 +37,7 @@ def _do_learn_wizard(settings_dlg, cb):
         if not wizard.exec():
             break
         # 继续学习：用编辑模式打开，加载已有组合
-        from broadlinkac_core.ir_learner import load_custom_codes
+        from acnexus_core.ir_learner import load_custom_codes
         existing = load_custom_codes().get(result["name"], {})
         new_dlg = NewRemoteDialog(settings_dlg, edit_mode=True,
                                    edit_name=result["name"],
@@ -61,7 +61,7 @@ def _do_learn_wizard(settings_dlg, cb):
 def _do_edit_custom(settings_dlg, cb, name, entry):
     """编辑已有自定义遥控器"""
     from .learn_dialog import NewRemoteDialog, LearnWizard, LOGO_LIST
-    from broadlinkac_core.ir_learner import load_custom_codes, save_custom_codes, list_custom
+    from acnexus_core.ir_learner import load_custom_codes, save_custom_codes, list_custom
 
     # 打开编辑窗口（加载已有数据）
     edit_dlg = NewRemoteDialog(settings_dlg, edit_mode=True, edit_name=name, edit_logo=entry.get("logo", ""), edit_codes=entry.get("codes", {}))
@@ -234,7 +234,7 @@ def open_settings(app):
     autostart_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
     autostart_cb.setEditable(True); autostart_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); autostart_cb.lineEdit().setReadOnly(True)
     def toggle_autostart(txt):
-        script = os.path.join(os.path.dirname(__file__), "..", "ac_controller_pyside6.py")
+        script = os.path.join(os.path.dirname(__file__), "..", "..", "ac_controller_pyside6.py")
         if txt == "开": _autostart.enable(script)
         else: _autostart.disable()
     autostart_cb.currentTextChanged.connect(toggle_autostart)
@@ -291,7 +291,7 @@ def open_settings(app):
     r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0)
     rl.addWidget(QtWidgets.QLabel("空调遥控器:")); rl.addStretch(1)
     brand_cb = QtWidgets.QComboBox(); brand_cb.addItems(list(AC_BRANDS.keys()))
-    from broadlinkac_core.ir_learner import list_custom
+    from acnexus_core.ir_learner import list_custom
     customs = list_custom()
     for c in customs:
         brand_cb.addItem("🛠 " + c)
@@ -303,6 +303,13 @@ def open_settings(app):
     brand_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
     brand_cb.setEditable(True); brand_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); brand_cb.lineEdit().setReadOnly(True)
     rl.addWidget(brand_cb, alignment=QtCore.Qt.AlignRight); c1l.addWidget(r)
+    brand_row = r  # 保存引用供米家模式隐藏
+
+    # 米家模式提示（默认隐藏）
+    miot_hint = QtWidgets.QLabel("请在米家APP中切换遥控器")
+    miot_hint.setStyleSheet("color: #888; font-size: 12px;")
+    miot_hint.setVisible(False)
+    c1l.addWidget(miot_hint, alignment=QtCore.Qt.AlignRight)
 
     r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0)
     rl.addWidget(QtWidgets.QLabel("自定义遥控器:"))
@@ -325,11 +332,11 @@ def open_settings(app):
         if QtWidgets.QMessageBox.question(dlg, "确认删除", "确定要删除 '" + name + "' 及其所有学习码吗？",
                                           QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No) != QtWidgets.QMessageBox.Yes:
             return
-        from broadlinkac_core.ir_learner import load_custom_codes, save_custom_codes
+        from acnexus_core.ir_learner import load_custom_codes, save_custom_codes
         codes = load_custom_codes(); codes.pop(name, None); save_custom_codes(codes)
         for i in range(brand_cb.count() - 1, -1, -1):
             if brand_cb.itemText(i).startswith("🛠 "): brand_cb.removeItem(i)
-        from broadlinkac_core.ir_learner import list_custom
+        from acnexus_core.ir_learner import list_custom
         for c in list_custom(): brand_cb.addItem("🛠 " + c)
         brand_cb.setCurrentText("格力"); del_btn.setVisible(False); edit_btn.setVisible(False)
     del_btn.clicked.connect(_delete_custom); rl.addWidget(del_btn)
@@ -341,7 +348,7 @@ def open_settings(app):
         name = brand_cb.currentText()
         if not name.startswith("🛠 "): return
         name = name[2:]
-        from broadlinkac_core.ir_learner import load_custom_codes
+        from acnexus_core.ir_learner import load_custom_codes
         all_codes = load_custom_codes()
         entry = all_codes.get(name)
         if not entry: return
@@ -355,6 +362,14 @@ def open_settings(app):
         "新增自定义遥控器")
     learn_btn.clicked.connect(lambda: _do_learn_wizard(dlg, brand_cb))
     rl.addWidget(learn_btn); c1l.addWidget(r)
+    custom_row = r  # 保存引用供米家模式隐藏
+
+    # 米家模式：隐藏品牌切换和学习控件
+    if app._brand_type == "xiaomi_cloud":
+        brand_row.setVisible(False)
+        custom_row.setVisible(False)
+        miot_hint.setVisible(True)
+
     swl.addWidget(card1)
 
     # ── 2. 城市设置 ──
@@ -384,7 +399,13 @@ def open_settings(app):
     c2l.addWidget(lbl("自动定位基于IP, 建议使用搜索", size=9, color="gray"), alignment=QtCore.Qt.AlignRight)
 
     sr = QtWidgets.QWidget(); srl = QtWidgets.QHBoxLayout(sr); srl.setContentsMargins(0, 0, 0, 0)
-    city_entry = QtWidgets.QLineEdit()
+    class _CityEdit(QtWidgets.QLineEdit):
+        def keyPressEvent(self, event):
+            if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                self.do_search()
+                return  # 吞掉 Enter，不传给 dialog
+            super().keyPressEvent(event)
+    city_entry = _CityEdit()
     city_entry.setPlaceholderText("输入位置(如：翻斗花园)")
     city_entry.setObjectName("city_search_input")
     srl.addWidget(city_entry)
@@ -395,6 +416,7 @@ def open_settings(app):
         if not city: return
         search_btn.setText("⏳ 搜索中...")
         QtCore.QTimer.singleShot(50, lambda: _do_search_thread(city))
+    city_entry.do_search = do_search
     def _reset_btn():
         search_btn.setText("  🔍 搜索  ")
     def _do_search_thread(city):

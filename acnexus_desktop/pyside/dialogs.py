@@ -4,10 +4,10 @@ import os, sys, subprocess, json, urllib.request, threading
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import broadlinkac_core.config as _cfg
-from broadlinkac_core.config import save_config, apply_config, AC_BRANDS, LOG_DIR
-from broadlinkac_core.ac_control import MODES, MODE_KEYS
-from broadlinkac_core.logger import get_log_dates, write_log
+import acnexus_core.config as _cfg
+from acnexus_core.config import save_config, apply_config, AC_BRANDS, LOG_DIR
+from acnexus_core.ac_control import MODES, MODE_KEYS
+from acnexus_core.logger import get_log_dates, write_log
 from ._utils import lbl
 
 
@@ -28,13 +28,13 @@ def _make_dialog(parent, title, w, h, frameless=False):
     return dlg
 
 
-def _dialog_content(dlg, title="", title_size=13, frameless=False):
+def _dialog_content(dlg, title="", title_size=13, frameless=False, scroll=True, bg_override=None):
     """返回 (layout, swl)，Windows 下自绘标题+白底圆角，其他原生
        frameless=True 跳过外层卡片框，用原生窗口背景"""
     if sys.platform == "win32" and not frameless:
         from ._utils import is_dark
         dark = is_dark()
-        bg = "#2D2D2D" if dark else "white"
+        bg = bg_override if bg_override else ("#2D2D2D" if dark else "white")
         bd = "#444" if dark else "#DEDEDE"
         outer = QtWidgets.QFrame(dlg)
         outer.setStyleSheet(f"QFrame {{ background:{bg}; border:1px solid {bd}; border-radius:12px; }}")
@@ -49,10 +49,15 @@ def _dialog_content(dlg, title="", title_size=13, frameless=False):
             close.clicked.connect(dlg.reject); tl.addWidget(close)
             ov.addWidget(tb)
         layout = QtWidgets.QVBoxLayout(); layout.setContentsMargins(12, 8, 12, 12)
-        scroll = QtWidgets.QScrollArea(); scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border:none; background:transparent; }")
-        sw = QtWidgets.QWidget(); sw.setStyleSheet(f"background: {bg};")
-        swl = QtWidgets.QVBoxLayout(sw); scroll.setWidget(sw); layout.addWidget(scroll)
+        if scroll:
+            sw = QtWidgets.QWidget(); sw.setStyleSheet(f"background: {bg};")
+            swl = QtWidgets.QVBoxLayout(sw)
+            sa = QtWidgets.QScrollArea(); sa.setWidgetResizable(True)
+            sa.setStyleSheet("QScrollArea { border:none; background:transparent; }")
+            sa.setWidget(sw); layout.addWidget(sa)
+        else:
+            swl = QtWidgets.QVBoxLayout()
+            layout.addLayout(swl)
         ov.addLayout(layout)
         full = QtWidgets.QVBoxLayout(dlg); full.setContentsMargins(0, 0, 0, 0); full.addWidget(outer)
     else:
@@ -62,7 +67,10 @@ def _dialog_content(dlg, title="", title_size=13, frameless=False):
         if frameless:
             from ._utils import is_dark
             dlg.setStyleSheet(f"QDialog {{ background:{ '#2D2D2D' if is_dark() else 'white' }; }}")
-        sw = QtWidgets.QWidget(); swl = QtWidgets.QVBoxLayout(sw); layout.addWidget(sw)
+        if scroll:
+            sw = QtWidgets.QWidget(); swl = QtWidgets.QVBoxLayout(sw); layout.addWidget(sw)
+        else:
+            swl = QtWidgets.QVBoxLayout(); layout.addLayout(swl)
     return layout, swl
 
 
@@ -75,20 +83,20 @@ from .repair_dialog import open_repair  # noqa: F401
 
 
 def open_about(parent):
-    dlg = _make_dialog(parent, "关于 BroadlinkAC", 440, 360, frameless=True)
+    dlg = _make_dialog(parent, "关于 AC-Nexus", 440, 360, frameless=True)
     layout, swl = _dialog_content(dlg, frameless=True)
 
     layout.addStretch()
-    layout.addWidget(lbl("BroadlinkAC v5.1", bold=True, size=18), alignment=QtCore.Qt.AlignCenter)
+    layout.addWidget(lbl("AC-Nexus v5.2", bold=True, size=18), alignment=QtCore.Qt.AlignCenter)
     layout.addSpacing(10)
     layout.addWidget(lbl("智能空调控制系统", size=13), alignment=QtCore.Qt.AlignCenter)
-    layout.addWidget(lbl("支持 Broadlink RM 系列红外设备", color="#666", size=11), alignment=QtCore.Qt.AlignCenter)
+    layout.addWidget(lbl("Broadlink RM + 米家 MIoT 红外遥控器", color="#666", size=11), alignment=QtCore.Qt.AlignCenter)
     layout.addSpacing(12)
-    layout.addWidget(lbl("十余种空调品牌遥控 | 室外温度实时监测", color="#555", size=11), alignment=QtCore.Qt.AlignCenter)
+    layout.addWidget(lbl("17 品牌空调遥控 | 室外温度实时监测", color="#555", size=11), alignment=QtCore.Qt.AlignCenter)
     layout.addWidget(lbl("台风路径预报与预警 | 多时段定时开关 | 智能温控", color="#555", size=11), alignment=QtCore.Qt.AlignCenter)
     layout.addSpacing(16)
 
-    gh_url = "https://github.com/oywq00008-cell/BroadlinkAC-For-Agent"
+    gh_url = "https://github.com/oywq00008-cell/AC-Nexus-For-Agent"
     gh_link = QtWidgets.QLabel(f'<a href="{gh_url}" style="color:#2F80ED;">{gh_url}</a>')
     gh_link.setOpenExternalLinks(True)
     gh_link.setStyleSheet("font-size:10px;")
@@ -164,11 +172,14 @@ def open_rename_device(parent, old_name, mac):
 
 # ── 设备删除确认 ──
 def open_delete_device(parent, name=None, allow=True):
-    dlg = _make_dialog(parent, "删除设备", 380, 160, frameless=True)
+    dlg = _make_dialog(parent, "删除设备", 360, 160, frameless=True)
     layout, swl = _dialog_content(dlg, frameless=True)
 
     if allow:
-        swl.addWidget(lbl(f"确定要删除「{name}」吗？此操作不可撤销。", size=13))
+        msg = lbl(f"确定要删除「{name}」吗？此操作不可撤销。", size=13)
+        msg.setWordWrap(True)
+        msg.setMaximumWidth(300)
+        swl.addWidget(msg)
     else:
         swl.addWidget(lbl("无法删除：至少需要保留一台设备。", size=13, color="#E74C3C"))
     swl.addStretch()
@@ -266,7 +277,7 @@ def edit_rules(app):
             return
         brand = _cfg.config.get("brand", "格力")
         if brand not in AC_BRANDS:
-            from broadlinkac_core.ir_learner import get_raw_code
+            from acnexus_core.ir_learner import get_raw_code
             missing = []
             for low, high, target, mode in rules:
                 if target == 0:
@@ -288,7 +299,13 @@ def edit_rules(app):
                 mb.exec()
                 if mb.clickedButton() != save_btn:
                     return
-        _cfg.config["temp_rules"] = rules; save_config(_cfg.config); app._refresh_rules_display()
+        _cfg.config["temp_rules"] = rules
+        # 同时直接写入当前设备，避免依赖 save_config sync
+        mac = _cfg.config.get("current_device_mac", "")
+        provider = _cfg.config.get("current_brand_type", "broadlink")
+        dev = _cfg.config.setdefault("devices", {}).setdefault(provider, {}).setdefault(mac, {})
+        dev["temp_rules"] = rules
+        save_config(_cfg.config); app._refresh_rules_display()
         write_log("系统", "已更新温度规则")
         dlg.accept()
     b = QtWidgets.QPushButton("💾 保存")

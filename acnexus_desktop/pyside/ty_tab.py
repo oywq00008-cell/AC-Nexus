@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import broadlinkac_core.config as _cfg
+import acnexus_core.config as _cfg
 from ._utils import frm, lbl, toggle
 
 
@@ -331,7 +331,7 @@ def _do_render_typhoon(app):
         if not detail:
             continue
 
-        from broadlinkac_core.typhoon import calc_distance
+        from acnexus_core.typhoon import calc_distance
         dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
                              detail["lat"], detail["lon"])
         alert = dist < _cfg.config.get("typhoon_alert_km", 800)

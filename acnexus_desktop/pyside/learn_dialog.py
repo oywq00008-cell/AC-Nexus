@@ -4,7 +4,7 @@ import sys
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from broadlinkac_core.ir_learner import save_learned_codes
+from acnexus_core.ir_learner import save_learned_codes
 
 from ._utils import lbl, is_dark
 
@@ -221,7 +221,7 @@ class NewRemoteDialog:
             QtWidgets.QMessageBox.warning(self.dlg, "提示", "请输入设备名称")
             return
         if name in BUILTIN_BRANDS:
-            from broadlinkac_core.config import AC_BRANDS
+            from acnexus_core.config import AC_BRANDS
             if name in AC_BRANDS:
                 QtWidgets.QMessageBox.warning(self.dlg, "提示", f"'{name}' 是内置品牌名，请换一个名称")
                 return
@@ -287,7 +287,7 @@ class LearnWizard:
         self._build_step()
 
     def _resolve_host(self):
-        import broadlinkac_core.config as _cfg
+        import acnexus_core.config as _cfg
         dev = _cfg.get_current_device()
         host = dev.get("host", "")
         if not host:

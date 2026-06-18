@@ -7,9 +7,9 @@
 1. 打开"终端"（在启动台 → 其他 里找）
 2. 复制粘贴下面这行命令，按回车：
 
-   xattr -cr /Applications/BroadlinkAC.app
+   xattr -cr /Applications/AC-Nexus.app
 
-3. 重新双击 BroadlinkAC.app 就能打开了
+3. 重新双击 AC-Nexus.app 就能打开了
 
 （这行命令的意思是"去掉隔离标记"，不会伤害电脑）
 
@@ -23,6 +23,6 @@
 
 如果提示"权限不足"：
 
-右键 BroadlinkAC → 属性 → 权限 → 勾选"允许作为程序执行"
+右键 AC-Nexus → 属性 → 权限 → 勾选"允许作为程序执行"
 
-或者在终端执行：chmod +x BroadlinkAC
+或者在终端执行：chmod +x AC-Nexus

@@ -1,11 +1,11 @@
-"""BroadlinkAC Core — 天气与城市搜索"""
+"""AC-Nexus Core — 天气与城市搜索"""
 
 import json
 import gzip
 import ssl
 import urllib.request
 import urllib.parse
-import broadlinkac_core.config as _cfg
+import acnexus_core.config as _cfg
 
 
 def _urlopen(url, timeout=8):
@@ -13,7 +13,7 @@ def _urlopen(url, timeout=8):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    req = urllib.request.Request(url, headers={"User-Agent": "BroadlinkAC/2.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "AC-Nexus/2.0"})
     return urllib.request.urlopen(req, timeout=timeout, context=ctx)
 
 

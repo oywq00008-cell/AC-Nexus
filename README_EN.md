@@ -1,13 +1,13 @@
-# 🎮 BroadlinkAC v5.1
+# 🎮 AC-Nexus v5.2
 
 [中文](README.md) | English
 
-BroadlinkAC is more than a desktop AC remote — it's an **IR control protocol stack built for AI Agents**. Plug in a Broadlink RM IR blaster, and any AI Agent can control **17 AC brands** (Gree, Hitachi, Daikin, etc.) with a single line of Python: `import broadlinkac_core`. **Built-in IR learning** lets you teach the system codes from your original remote for any brand not in the list. Multi-device parallel scheduling, outdoor-temperature-aware auto-adjust, typhoon path forecasting — the desktop app (PySide6) and headless Agent mode share the exact same core. Windows, macOS & Linux, works out of the box.
+AC-Nexus is more than a desktop AC remote — it's an **IR control protocol stack built for AI Agents**. Plug in a Broadlink RM IR blaster, and any AI Agent can control **17 AC brands** (Gree, Hitachi, Daikin, etc.) with a single line of Python: `import acnexus_core`. **Built-in IR learning** lets you teach the system codes from your original remote for any brand not in the list. Multi-device parallel scheduling, outdoor-temperature-aware auto-adjust, typhoon path forecasting — the desktop app (PySide6) and headless Agent mode share the exact same core. Windows, macOS & Linux, works out of the box.
 
 ## 🤖 Agent API
 
 ```python
-from broadlinkac_core import init, send_ac, get_device_list
+from acnexus_core import init, send_ac, get_device_list
 
 # One-time init (auto-persisted to config.json)
 init(api_key="your_key", qw_host="https://your_host",
@@ -22,7 +22,7 @@ for mac, name in get_device_list():
     print(f"{name}: {mac}")
 
 # Storm threat assessment
-from broadlinkac_core import typhoon_threat_distance
+from acnexus_core import typhoon_threat_distance
 dist, name = typhoon_threat_distance()
 if dist < 100:
     send_ac("off", "cool", 26, "auto", source="typhoon")  # auto-shutdown near storm
@@ -85,7 +85,7 @@ Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — 
 
 ## 📡 Deploy on OpenWRT Router
 
-> **[BroadlinkAC-OpenWRT](https://github.com/oywq00008-cell/BroadlinkAC-OpenWRT)** — LuCI control panel + procd daemon + IPK one-click install
+> **[AC-Nexus-OpenWRT](https://github.com/oywq00008-cell/AC-Nexus-OpenWRT)** — LuCI control panel + procd daemon + IPK one-click install
 
 Both projects share the core algorithm and IR protocols, evolving independently.
 
@@ -95,16 +95,16 @@ Both projects share the core algorithm and IR protocols, evolving independently.
 
 | Platform | Download |
 |----------|----------|
-| 🪟 Windows | [BroadlinkAC.exe](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-Windows.zip) |
-| 🍎 macOS | [BroadlinkAC.app](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-macOS.zip) |
-| 🐧 Linux | [BroadlinkAC-linux](https://github.com/oywq00008-cell/BroadlinkAC-For-Agent/releases/latest/download/BroadlinkAC-linux.tar.gz) |
+| 🪟 Windows | [AC-Nexus.exe](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-Windows.zip) |
+| 🍎 macOS | [AC-Nexus.app](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-macOS.zip) |
+| 🐧 Linux | [AC-Nexus-linux](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-linux.tar.gz) |
 
 macOS first run: if you see "unable to verify developer", unzip and open `打不开请看我.txt` first.
 
 From source:
 ```bash
-git clone https://github.com/oywq00008-cell/BroadlinkAC-For-Agent.git
-cd BroadlinkAC-For-Agent
+git clone https://github.com/oywq00008-cell/AC-Nexus-For-Agent.git
+cd AC-Nexus-For-Agent
 pip install -r requirements.txt
 python ac_controller_pyside6.py
 ```
@@ -116,7 +116,7 @@ pip install -r requirements-core.txt
 ```
 
 ```python
-from broadlinkac_core import init, send_ac
+from acnexus_core import init, send_ac
 init()
 send_ac("on", "cool", 26, "auto")
 ```
@@ -129,7 +129,7 @@ Fill in weather API key via Settings on first run (Baidu 5k/day or QWeather 50k/
 
 ```
 ac_controller_pyside6.py      # PySide6 entry point
-broadlinkac_core/             # Core library (zero GUI deps)
+acnexus_core/             # Core library (zero GUI deps)
 ├── __init__.py               # Public API
 ├── config.py                 # Config + resolve_brand() + device mgmt + city search
 ├── weather.py                # Dual-source weather + alerts
@@ -139,7 +139,7 @@ broadlinkac_core/             # Core library (zero GUI deps)
 ├── scheduler.py              # Scheduling (multi-group templates)
 ├── autostart.py              # Cross-platform auto-start
 └── logger.py                 # Logging
-broadlinkac_desktop/          # PySide6 desktop GUI
+acnexus_desktop/          # PySide6 desktop GUI
 ├── app_pyside6.py            # Main window + global styles
 └── pyside/                   # UI modules (6 files)
     ├── ac_tab.py             # AC + Weather + Timer + Rules
@@ -155,9 +155,9 @@ protocols/                    # Custom IR protocols
 logos/                        # Brand logos
 fonts/                        # Fonts (HarmonyOS Sans SC)
 icons/                        # SVG icon system
-BroadlinkAC.spec              # Windows build
-BroadlinkAC-macOS.spec        # macOS build
-BroadlinkAC-linux.spec        # Linux build
+AC-Nexus.spec              # Windows build
+AC-Nexus-macOS.spec        # macOS build
+AC-Nexus-linux.spec        # Linux build
 requirements.txt              # Full deps
 requirements-core.txt         # Agent-only deps
 ```

@@ -1,19 +1,34 @@
-"""BroadlinkAC Core — 定时任务"""
+"""AC-Nexus Core — 定时任务"""
 
 import time
 import threading
 from datetime import datetime
 import schedule as sch
 
-import broadlinkac_core.config as _cfg
+import acnexus_core.config as _cfg
 
-from broadlinkac_core.weather import fetch_weather
-from broadlinkac_core.ac_control import send_ac, decide_ac, MODE_KEYS
-from broadlinkac_core.logger import write_log, get_last_ac_state
+from acnexus_core.weather import fetch_weather
+from acnexus_core.ac_control import send_ac, decide_ac, MODE_KEYS
+from acnexus_core.logger import write_log, get_last_ac_state
 
 _sched_lock = threading.RLock()
 _sched_event = threading.Event()
 _sched_thread = None
+_sched_paused = False
+
+
+def pause_scheduler():
+    """台风靠近时暂停调度器：标记暂停 + 唤醒线程重新检查状态"""
+    global _sched_paused
+    _sched_paused = True
+    _sched_event.set()
+
+
+def resume_scheduler():
+    """台风远离/用户关开关时恢复调度器：取消暂停 + 唤醒线程"""
+    global _sched_paused
+    _sched_paused = False
+    _sched_event.set()
 
 
 def _device_online(mac):
@@ -22,7 +37,7 @@ def _device_online(mac):
 
 
 def scheduled_job(mac):
-    dev = _cfg.config.get("devices", {}).get(mac, {})
+    provider, dev = _cfg.find_device(mac)
     name = dev.get("name", mac[:8])
     if not _device_online(mac):
         write_log("系统", f"⏰ [{name}] 定时触发 → 设备离线，跳过")
@@ -41,14 +56,6 @@ def scheduled_job(mac):
         write_log("空调", f"⏰ [{name}] 定时触发: 室外 {outdoor}°C → 关闭，不发送指令")
         return None
 
-    # 台风保护：风暴 < 100km 时不启动空调
-    from broadlinkac_core.typhoon import typhoon_threat_distance
-    min_dist, storm_name = typhoon_threat_distance()
-    if min_dist < 100:
-        write_log("系统",
-                  f"⏰ [{name}] 定时触发: 风暴 {storm_name} 距 {min_dist}km，跳过开机")
-        return None
-
     try:
         result = send_ac("on", mode, target, "auto", source="定时", mac=mac)
         write_log("空调", result)
@@ -60,7 +67,7 @@ def scheduled_job(mac):
 
 def scheduled_off_job(mac):
     """定时关机"""
-    dev = _cfg.config.get("devices", {}).get(mac, {})
+    provider, dev = _cfg.find_device(mac)
     name = dev.get("name", mac[:8])
     if not _device_online(mac):
         write_log("系统", f"⏰ [{name}] 定时关机 → 设备离线，跳过")
@@ -71,12 +78,6 @@ def scheduled_off_job(mac):
         write_log("系统", f"⏰ [{name}] 定时关机 → 无法判定空调状态，跳过")
         return None
     if state["power"] == "off":
-        return None
-    # 台风保护：已被台风关机的跳过
-    from broadlinkac_core.typhoon import typhoon_threat_distance
-    min_dist, _ = typhoon_threat_distance()
-    if min_dist < 100:
-        write_log("系统", f"⏰ [{name}] 定时关机 → 风暴已处理，跳过")
         return None
 
     try:
@@ -90,7 +91,7 @@ def scheduled_off_job(mac):
 
 def auto_adjust_job(mac):
     """每2小时自动调温：读日志判状态 → 跑规则 → 温度无变化则跳过"""
-    dev = _cfg.config.get("devices", {}).get(mac, {})
+    provider, dev = _cfg.find_device(mac)
     name = dev.get("name", mac[:8])
     if not _device_online(mac):
         write_log("系统", f"🔄 [{name}] 自动调温 → 设备离线，跳过")
@@ -158,7 +159,8 @@ def _migrate_schedule_config():
             }
             mac = _cfg.config.get("current_device_mac")
             if mac:
-                _cfg.config.setdefault("devices", {}).setdefault(mac, {})["active_template"] = "默认"
+                provider = _cfg.config.get("current_brand_type", "broadlink")
+                _cfg.config.setdefault("devices", {}).setdefault(provider, {}).setdefault(mac, {})["active_template"] = "默认"
         for k in ("trigger_time", "off_time", "schedule_enabled", "off_enabled"):
             _cfg.config.pop(k, None)
     # 迁移旧 days/slots 结构 → groups
@@ -167,41 +169,44 @@ def _migrate_schedule_config():
             tmpl["groups"] = [{"days": tmpl.pop("days", [1,2,3,4,5]),
                                 "slots": tmpl.pop("slots", [])}]
     _cfg.config["_schedule_migrated"] = True
-    from broadlinkac_core.config import save_config
+    from acnexus_core.config import save_config
     save_config(_cfg.config)
 
 
 def _do_register():
-    """纯注册逻辑：清空并重新注册所有设备的定时任务。返回是否有任务。"""
+    """纯注册逻辑：清空并重新注册所有品牌所有设备的定时任务。返回是否有任务。"""
     with _sched_lock:
         sch.clear()
         _migrate_schedule_config()
         templates = _cfg.config.get("schedule_templates", {}) or {}
-        for mac, dev in _cfg.config.get("devices", {}).items():
-            tmpl_name = dev.get("active_template")
-            tmpl = templates.get(tmpl_name) if tmpl_name else None
-            if tmpl and dev.get("schedule_enabled", True):
-                groups = tmpl.get("groups", [])
-                # 向后兼容：无 groups 但有 days
-                if not groups and tmpl.get("days"):
-                    groups = [{"days": tmpl["days"], "slots": tmpl.get("slots", [])}]
-                for grp in groups:
-                    days = set(grp.get("days", []))
-                    for slot in grp.get("slots", []):
-                        on_t = slot.get("on")
-                        off_t = slot.get("off")
-                        if on_t and slot.get("on_enabled", True):
-                            sch.every().day.at(on_t).do(_scheduled_on_wrapper, mac=mac, days=days)
-                        if off_t and slot.get("off_enabled", True):
-                            sch.every().day.at(off_t).do(_scheduled_off_wrapper, mac=mac, days=days)
-            else:
-                # 向后兼容：没有模板时用旧字段
-                if dev.get("schedule_enabled", True) and dev.get("trigger_time"):
-                    sch.every().day.at(dev["trigger_time"]).do(scheduled_job, mac=mac)
-                if dev.get("off_enabled") and dev.get("off_time"):
-                    sch.every().day.at(dev["off_time"]).do(scheduled_off_job, mac=mac)
-            if dev.get("auto_adjust", True):
-                sch.every(2).hours.do(auto_adjust_job, mac=mac)
+        for provider, devs in _cfg.config.get("devices", {}).items():
+            if not isinstance(devs, dict):
+                continue
+            for mac, dev in devs.items():
+                tmpl_name = dev.get("active_template")
+                tmpl = templates.get(tmpl_name) if tmpl_name else None
+                if tmpl and dev.get("schedule_enabled", True):
+                    groups = tmpl.get("groups", [])
+                    # 向后兼容：无 groups 但有 days
+                    if not groups and tmpl.get("days"):
+                        groups = [{"days": tmpl["days"], "slots": tmpl.get("slots", [])}]
+                    for grp in groups:
+                        days = set(grp.get("days", []))
+                        for slot in grp.get("slots", []):
+                            on_t = slot.get("on")
+                            off_t = slot.get("off")
+                            if on_t and slot.get("on_enabled", True):
+                                sch.every().day.at(on_t).do(_scheduled_on_wrapper, mac=mac, days=days)
+                            if off_t and slot.get("off_enabled", True):
+                                sch.every().day.at(off_t).do(_scheduled_off_wrapper, mac=mac, days=days)
+                else:
+                    # 向后兼容：没有模板时用旧字段
+                    if dev.get("schedule_enabled", True) and dev.get("trigger_time"):
+                        sch.every().day.at(dev["trigger_time"]).do(scheduled_job, mac=mac)
+                    if dev.get("off_enabled") and dev.get("off_time"):
+                        sch.every().day.at(dev["off_time"]).do(scheduled_off_job, mac=mac)
+                if dev.get("auto_adjust", True):
+                    sch.every(2).hours.do(auto_adjust_job, mac=mac)
     return bool(sch.get_jobs())
 
 
@@ -219,6 +224,10 @@ def scheduler_loop():
             if not has_jobs:
                 return
             while True:
+                if _sched_paused:
+                    _sched_event.wait()          # 暂停：阻塞等待恢复信号
+                    _sched_event.clear()
+                    break                        # 跳出，外层重新 _do_register
                 idle = sch.idle_seconds()
                 timeout = max(idle, 0) if idle is not None else 30
                 if _sched_event.wait(timeout=timeout):
