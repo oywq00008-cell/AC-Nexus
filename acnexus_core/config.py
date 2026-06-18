@@ -266,11 +266,14 @@ def search_city(name):
 
 def search_cities(name):
     """城市搜索（多条）— 返回 [(lat, lon, 显示名, 省, 归一化层级), ...] 或 []"""
-    import urllib.request, json, re
+    import urllib.request, json, re, ssl
     try:
         url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(name)}&format=json&limit=8&accept-language=zh&addressdetails=1"
         req = urllib.request.Request(url, headers={"User-Agent": "AC-Nexus"})
-        resp = urllib.request.urlopen(req, timeout=8)
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        resp = urllib.request.urlopen(req, timeout=8, context=ctx)
         data = json.loads(resp.read())
         results = []
         for item in data:
