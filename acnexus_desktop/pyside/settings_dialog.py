@@ -280,6 +280,9 @@ def open_settings(app):
                 btn.setStyleSheet(f"QPushButton#settings_cancel_btn {{ background:{'#555' if dark else 'white'}; color:{'#DDD' if dark else '#333'}; border:1px solid {'#666' if dark else '#DEDEDE'}; border-radius:8px; font-size:13px; }} QPushButton#settings_cancel_btn:hover {{ background:{'#666' if dark else '#F5F5F5'}; }}")
             elif btn.objectName() == "settings_save_btn":
                 btn.setStyleSheet(f"QPushButton#settings_save_btn {{ background:{'#0076D4' if not dark else '#2F80ED'}; color:white; border:1px solid {'#0076D4' if not dark else '#2F80ED'}; border-radius:8px; font-size:13px; font-weight:500; }} QPushButton#settings_save_btn:hover {{ background:{'#0065B8' if not dark else '#1A6FD8'}; }}")
+        # 下拉框（Windows 暗色模式防黑底）
+        for combo in dlg.findChildren(QtWidgets.QComboBox):
+            combo.setStyleSheet(f"QComboBox {{ background:{'#3D3D3D' if dark else '#FAFAFA'}; color:{'#EEE' if dark else '#333'}; border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:6px; padding:2px 6px; selection-background-color:#2F80ED; selection-color:white; }} QComboBox:hover {{ border-color:{'#777' if dark else '#BBB'}; }}")
     def on_theme_change(t):
         mode = {v: k for k, v in mode_map.items()}.get(t, "system")
         apply_theme(mode)
