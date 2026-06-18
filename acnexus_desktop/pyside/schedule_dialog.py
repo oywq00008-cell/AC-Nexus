@@ -70,7 +70,6 @@ def open_schedule_template(app):
     outer = dlg.findChild(QtWidgets.QFrame)
     if outer:
         outer.setObjectName("schedule_outer")
-        from ._utils import is_dark
         _dark2 = is_dark()
         _bg = "#383838" if _dark2 else "white"
         _bd = "#444" if _dark2 else "#DEDEDE"

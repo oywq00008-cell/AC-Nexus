@@ -419,18 +419,19 @@ def _schedule_card(app, grid):
         mac = _cfg.config.get("current_device_mac", "")
         provider = _cfg.config.get("current_brand_type", "broadlink")
         dev = _cfg.config.setdefault("devices", {}).setdefault(provider, {}).setdefault(mac, {})
+        name = dev.get("name", mac[:8] if mac else "未知")
         if t == "< 关闭定时 >":
             dev.pop("active_template", None)
             dev["schedule_enabled"] = False
             _cfg.config["schedule_enabled"] = False
             from acnexus_core.logger import write_log
-            write_log("定时", "已关闭")
+            write_log("定时", f"[{name}] 已关闭")
         else:
             dev["active_template"] = t
             dev["schedule_enabled"] = True
             _cfg.config["schedule_enabled"] = True
             from acnexus_core.logger import write_log
-            write_log("定时", f"已开启 → {t}")
+            write_log("定时", f"[{name}] 已开启 → {t}")
         save_config(_cfg.config)
         from acnexus_core.scheduler import register_all_jobs
         import acnexus_core.scheduler as _sched

@@ -183,6 +183,8 @@ def _do_register():
             if not isinstance(devs, dict):
                 continue
             for mac, dev in devs.items():
+                if not isinstance(dev, dict):
+                    continue
                 tmpl_name = dev.get("active_template")
                 tmpl = templates.get(tmpl_name) if tmpl_name else None
                 if tmpl and dev.get("schedule_enabled", True):

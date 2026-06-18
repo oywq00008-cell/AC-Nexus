@@ -38,6 +38,7 @@ a = Analysis(
         'acnexus_desktop.pyside.xiaomi_login_dialog',
         'acnexus_desktop.pyside.xiaomi_device_picker',
         'schedule', 'python-miio', 'qrcode', 'Pillow',
+        'pycryptodome', 'keyring', 'requests',
     ] + pyside_hidden + collect_submodules('hvac_ir'),
     hookspath=[],
     hooksconfig={},
