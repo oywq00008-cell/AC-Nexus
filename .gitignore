@@ -2,9 +2,9 @@
 build/
 dist/
 *.spec
-!BroadlinkAC.spec
-!BroadlinkAC-macOS.spec
-!BroadlinkAC-linux.spec
+!AC-Nexus.spec
+!AC-Nexus-macOS.spec
+!AC-Nexus-linux.spec
 
 # Python
 __pycache__/
@@ -18,6 +18,8 @@ backup/
 
 # Binary assets (不推送)
 *.png
+!acnexus.png
+!logos/*.png
 *.exe
 
 # Tests (不推送)
