@@ -65,7 +65,7 @@ def open_schedule_template(app):
     active = dev.get("active_template", list(templates.keys())[0] if templates else "")
 
     dlg = _make_dialog(app, "定时模板编辑", 500, 560)
-    layout, swl = _dialog_content(dlg, title="定时模板编辑", bg_override="#383838")
+    layout, swl = _dialog_content(dlg, title="定时模板编辑", bg_override=("#383838" if is_dark() else None))
     # 阴影
     outer = dlg.findChild(QtWidgets.QFrame)
     if outer:
