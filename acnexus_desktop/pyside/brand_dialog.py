@@ -15,8 +15,9 @@ _LOGO_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "logos")
 
 def open_brand_dialog(parent, current_brand="broadlink"):
     """弹出品牌选择弹窗，返回选中的 brand_type，取消返回 None"""
-    dlg = QtWidgets.QDialog(parent, QtCore.Qt.FramelessWindowHint)
-    dlg.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+    dlg = QtWidgets.QDialog(parent, QtCore.Qt.FramelessWindowHint if sys.platform == "win32" else QtCore.Qt.Dialog)
+    if sys.platform == "win32":
+        dlg.setAttribute(QtCore.Qt.WA_TranslucentBackground)
     dlg.setWindowModality(QtCore.Qt.WindowModal)
     dlg.setWindowTitle("选择设备类型")
     dlg.resize(360, 340)
@@ -29,12 +30,13 @@ def open_brand_dialog(parent, current_brand="broadlink"):
     outer = QtWidgets.QFrame(dlg)
     outer.setObjectName("brand_outer")
     outer.setStyleSheet(f"QFrame#brand_outer {{ background:{bg}; border:1px solid {bd}; border-radius:12px; }}")
-    # 阴影
-    shadow = QtWidgets.QGraphicsDropShadowEffect()
-    shadow.setBlurRadius(24)
-    shadow.setOffset(0, 2)
-    shadow.setColor(QtGui.QColor(0, 0, 0, 80))
-    outer.setGraphicsEffect(shadow)
+    # 阴影 (Windows only)
+    if sys.platform == "win32":
+        shadow = QtWidgets.QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(24)
+        shadow.setOffset(0, 2)
+        shadow.setColor(QtGui.QColor(0, 0, 0, 80))
+        outer.setGraphicsEffect(shadow)
     ov = QtWidgets.QVBoxLayout(outer); ov.setContentsMargins(0, 0, 0, 0); ov.setSpacing(0)
 
     # 标题栏（可拖拽移动）
@@ -137,7 +139,7 @@ def open_brand_dialog(parent, current_brand="broadlink"):
     body.addLayout(btn_row)
     ov.addLayout(body)
 
-    full = QtWidgets.QVBoxLayout(dlg); full.setContentsMargins(10, 10, 10, 10); full.addWidget(outer)
+    full = QtWidgets.QVBoxLayout(dlg); full.setContentsMargins(10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0); full.addWidget(outer)
 
     result = {"brand": None}
 

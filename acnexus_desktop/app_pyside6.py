@@ -165,7 +165,7 @@ class App(QtWidgets.QMainWindow):
         m.addSeparator()
         m.addAction("关于 AC-Nexus", self._show_about)
         m.addAction("GitHub 主页", lambda: QtGui.QDesktopServices.openUrl(
-            QtCore.QUrl("https://github.com/oywq00008-cell/AC-Nexus-For-Agent")))
+            QtCore.QUrl("https://github.com/oywq00008-cell/AC-Nexus")))
 
     def _setup_tray(self):
         if IS_MAC: return
@@ -308,7 +308,7 @@ class App(QtWidgets.QMainWindow):
         self._brand_btn.setIcon(QtGui.QIcon(self._icon("device.svg")))
         self._brand_btn.setIconSize(QtCore.QSize(20, 20))
         self._brand_btn.setText(" 设备")
-        self._brand_btn.setFixedWidth(68)
+        self._brand_btn.setFixedWidth(55)
         self._brand_btn.setFixedHeight(28)
         self._brand_btn.setFlat(True)
         self._brand_btn.setToolTip("切换设备品牌类型 (博联 / 米家)")
@@ -486,7 +486,7 @@ class App(QtWidgets.QMainWindow):
         from .pyside._utils import is_dark
         hover_bg = "#3A3A3A" if is_dark() else "#E8F0FE"
         self._brand_btn.setStyleSheet(f"""
-            QPushButton {{ border:none; background:transparent; font-size:14px; font-weight:bold; padding: 2px 8px; }}
+            QPushButton {{ border:none; background:transparent; font-size:14px; font-weight:bold; padding: 0px; }}
             QPushButton:hover {{ background:{hover_bg}; border-radius:6px; }}
         """)
 

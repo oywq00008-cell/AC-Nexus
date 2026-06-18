@@ -1,4 +1,5 @@
 """米家设备选择弹窗 — 云拉取设备列表，勾选添加"""
+import sys
 import json
 import time
 import threading
@@ -134,8 +135,9 @@ def open_xiaomi_device_picker(parent, session_dict: dict) -> list[str]:
     """
     import acnexus_core.config as _cfg
 
-    dlg = QtWidgets.QDialog(parent, QtCore.Qt.FramelessWindowHint)
-    dlg.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+    dlg = QtWidgets.QDialog(parent, QtCore.Qt.FramelessWindowHint if sys.platform == "win32" else QtCore.Qt.Dialog)
+    if sys.platform == "win32":
+        dlg.setAttribute(QtCore.Qt.WA_TranslucentBackground)
     dlg.setWindowModality(QtCore.Qt.WindowModal)
     dlg.setWindowTitle("选择米家设备")
     dlg.resize(440, 420)  # 额外空间给阴影
@@ -148,11 +150,12 @@ def open_xiaomi_device_picker(parent, session_dict: dict) -> list[str]:
     outer = QtWidgets.QFrame(dlg)
     outer.setObjectName("xiaomi_picker_outer")
     outer.setStyleSheet(f"QFrame#xiaomi_picker_outer {{ background:{bg}; border:1px solid {bd}; border-radius:12px; }}")
-    shadow = QtWidgets.QGraphicsDropShadowEffect()
-    shadow.setBlurRadius(24)
-    shadow.setOffset(0, 2)
-    shadow.setColor(QtGui.QColor(0, 0, 0, 80))
-    outer.setGraphicsEffect(shadow)
+    if sys.platform == "win32":
+        shadow = QtWidgets.QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(24)
+        shadow.setOffset(0, 2)
+        shadow.setColor(QtGui.QColor(0, 0, 0, 80))
+        outer.setGraphicsEffect(shadow)
     ov = QtWidgets.QVBoxLayout(outer); ov.setContentsMargins(0, 0, 0, 0); ov.setSpacing(0)
 
     # 标题栏
@@ -235,7 +238,7 @@ def open_xiaomi_device_picker(parent, session_dict: dict) -> list[str]:
     body.addLayout(btn_row)
 
     ov.addLayout(body)
-    full = QtWidgets.QVBoxLayout(dlg); full.setContentsMargins(10, 10, 10, 10); full.addWidget(outer)
+    full = QtWidgets.QVBoxLayout(dlg); full.setContentsMargins(10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0); full.addWidget(outer)
 
     # ── 状态 ──
     checkboxes = []          # [(QCheckBox, device_dict), ...]

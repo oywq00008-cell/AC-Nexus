@@ -183,10 +183,12 @@ def open_settings(app):
         full.addWidget(outer)
     else:
         # macOS/Linux 原生窗口
+        dark = _is_dark()
+        dlg.setStyleSheet(f"QDialog {{ background:{'#2D2D2D' if dark else 'white'}; }}")
         layout = QtWidgets.QVBoxLayout(dlg)
         scroll = QtWidgets.QScrollArea(); scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border:none; }")
-        sw = QtWidgets.QWidget(); swl = QtWidgets.QVBoxLayout(sw); scroll.setWidget(sw); layout.addWidget(scroll)
+        scroll.setStyleSheet(f"QScrollArea {{ border:none; background:{'#2D2D2D' if dark else 'white'}; }}")
+        sw = QtWidgets.QWidget(); sw.setStyleSheet(f"background: {'#2D2D2D' if dark else 'white'};"); swl = QtWidgets.QVBoxLayout(sw); scroll.setWidget(sw); layout.addWidget(scroll)
         outer = dlg  # 兼容后续引用
         title_bar = None
         close_btn = None
@@ -217,6 +219,7 @@ def open_settings(app):
         sl.addWidget(tl, alignment=QtCore.Qt.AlignCenter)
         cl.addWidget(side)
         right = QtWidgets.QWidget()
+        right.setStyleSheet(f"background: transparent; border-top-right-radius:12px; border-bottom-right-radius:12px;")
         rl = QtWidgets.QVBoxLayout(right); rl.setContentsMargins(12, 10, 12, 10)
         cl.addWidget(right, 1)
         return card, rl
@@ -231,7 +234,6 @@ def open_settings(app):
     autostart_cb = QtWidgets.QComboBox(); autostart_cb.addItems(["关", "开"])
     autostart_cb.setCurrentText("开" if _autostart.is_enabled() else "关")
     autostart_cb.setMinimumWidth(140); autostart_cb.setMaximumWidth(140)
-    autostart_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
     autostart_cb.setEditable(True); autostart_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); autostart_cb.lineEdit().setReadOnly(True)
     def toggle_autostart(txt):
         script = os.path.join(os.path.dirname(__file__), "..", "..", "ac_controller_pyside6.py")
@@ -244,7 +246,6 @@ def open_settings(app):
     rl.addWidget(QtWidgets.QLabel("主题:")); rl.addStretch(1)
     theme_cb = QtWidgets.QComboBox()
     theme_cb.setMinimumWidth(140); theme_cb.setMaximumWidth(140)
-    theme_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
     theme_cb.setEditable(True); theme_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); theme_cb.lineEdit().setReadOnly(True)
     rl.addWidget(theme_cb, alignment=QtCore.Qt.AlignRight); c1l.addWidget(r)
     mode_map = {"system": "跟随系统", "light": "浅色", "dark": "深色"}
@@ -300,7 +301,6 @@ def open_settings(app):
     if idx >= 0: brand_cb.setCurrentIndex(idx)
     else: brand_cb.setCurrentText(cur_brand)
     brand_cb.setMinimumWidth(140); brand_cb.setMaximumWidth(140)
-    brand_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
     brand_cb.setEditable(True); brand_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); brand_cb.lineEdit().setReadOnly(True)
     rl.addWidget(brand_cb, alignment=QtCore.Qt.AlignRight); c1l.addWidget(r)
     brand_row = r  # 保存引用供米家模式隐藏
@@ -436,7 +436,8 @@ def open_settings(app):
         picker = QtWidgets.QDialog(dlg, QtCore.Qt.FramelessWindowHint if sys.platform == "win32" else QtCore.Qt.Dialog)
         picker.setWindowModality(QtCore.Qt.WindowModal)
         picker.setWindowTitle("选择城市")
-        picker.resize(340, 380)  # 预留阴影 (原 300×340 + 40)
+        picker.resize(340, 380)
+        title_text = "搜索结果 — 请选择你的城市" if results else f"未找到 \"{city}\" 的匹配结果"
         if sys.platform == "win32":
             picker.setAttribute(QtCore.Qt.WA_TranslucentBackground)
             dark = _is_dark()
@@ -455,7 +456,6 @@ def open_settings(app):
             tb = QtWidgets.QWidget(); tb.setFixedHeight(38)
             tb.setStyleSheet(f"background: transparent; border-bottom: 1px solid {outer_bd}; QWidget {{ border:none; background:transparent; }}")
             t_bl = QtWidgets.QHBoxLayout(tb); t_bl.setContentsMargins(14, 0, 8, 0)
-            title_text = "搜索结果 — 请选择你的城市" if results else f"未找到 \"{city}\" 的匹配结果"
             loc_icon = QtWidgets.QLabel()
             loc_icon_path = os.path.join(os.path.dirname(__file__), "..", "..", "icons", "location.svg")
             loc_icon.setPixmap(QtGui.QIcon(loc_icon_path).pixmap(18, 18))
@@ -481,6 +481,8 @@ def open_settings(app):
             inner = QtWidgets.QWidget(); iv = QtWidgets.QVBoxLayout(inner); iv.setContentsMargins(10, 8, 10, 10)
             ov.addWidget(inner)
         else:
+            dark = _is_dark()
+            picker.setStyleSheet(f"QDialog {{ background:{'#2D2D2D' if dark else 'white'}; }}")
             inner = picker; iv = QtWidgets.QVBoxLayout(inner)
             iv.setContentsMargins(14, 14, 14, 14)
             lw = QtWidgets.QListWidget()
@@ -545,7 +547,6 @@ def open_settings(app):
     provider_cb.addItems(["百度天气", "和风天气"])
     provider_cb.setCurrentText("百度天气" if _cfg.config.get("weather_provider", "baidu") == "baidu" else "和风天气")
     provider_cb.setMinimumWidth(140); provider_cb.setMaximumWidth(140)
-    provider_cb.setStyleSheet("QComboBox { selection-background-color: #2F80ED; selection-color: white; }")
     provider_cb.setEditable(True); provider_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); provider_cb.lineEdit().setReadOnly(True)
     prl.addWidget(provider_cb); prl.addStretch(); c3l.addWidget(pr)
 
@@ -616,5 +617,22 @@ def open_settings(app):
 
     # 初始化深色/浅色适配（必须在所有 widget 创建之后）
     _refresh_settings_theme(_is_dark())
+
+    # macOS/Linux: 补充控件框线（不碰 ::drop-down，保留 Fusion 原生箭头）
+    if sys.platform != "win32":
+        dark = _is_dark()
+        _arrow_file = os.path.join(icons_dir, "chevron_down.svg")
+        combo_qss = f"QComboBox {{ border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:6px; min-height:26px; background:{'#3D3D3D' if dark else '#FAFAFA'}; color:{'#EEE' if dark else '#333'}; }} QComboBox:hover {{ border-color:{'#777' if dark else '#BBB'}; }} QComboBox::drop-down {{ subcontrol-origin:padding; subcontrol-position:top right; width:20px; border-left:1px solid {'#555' if dark else '#DEDEDE'}; border-top-right-radius:6px; border-bottom-right-radius:6px; }} QComboBox::down-arrow {{ image: url({_arrow_file}); width:18px; height:18px; }} QComboBox QLineEdit {{ padding:2px 6px; background:transparent; }} QComboBox QAbstractItemView {{ selection-background-color:#2F80ED; selection-color:white; }}"
+        input_qss = f"QLineEdit {{ border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:6px; padding:4px 8px; background:{'#3D3D3D' if dark else 'white'}; color:{'#EEE' if dark else '#333'}; }}"
+        btn_qss   = f"QPushButton {{ border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:6px; padding:4px 14px; background:{'#3D3D3D' if dark else '#FAFAFA'}; color:{'#EEE' if dark else '#333'}; }} QPushButton:hover {{ background:{'#555' if dark else '#F0F0F0'}; }}"
+        for w in dlg.findChildren(QtWidgets.QComboBox):
+            if not w.styleSheet():
+                w.setStyleSheet(combo_qss)
+        for w in dlg.findChildren(QtWidgets.QLineEdit):
+            if not w.styleSheet():
+                w.setStyleSheet(input_qss)
+        for w in dlg.findChildren(QtWidgets.QPushButton):
+            if not w.styleSheet():
+                w.setStyleSheet(btn_qss)
 
     import threading; dlg.exec()

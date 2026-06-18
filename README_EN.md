@@ -1,165 +1,107 @@
-# 🎮 AC-Nexus v5.2
+# 🌀 AC-Nexus v5.2
 
 [中文](README.md) | English
 
-AC-Nexus is more than a desktop AC remote — it's an **IR control protocol stack built for AI Agents**. Plug in a Broadlink RM IR blaster, and any AI Agent can control **17 AC brands** (Gree, Hitachi, Daikin, etc.) with a single line of Python: `import acnexus_core`. **Built-in IR learning** lets you teach the system codes from your original remote for any brand not in the list. Multi-device parallel scheduling, outdoor-temperature-aware auto-adjust, typhoon path forecasting — the desktop app (PySide6) and headless Agent mode share the exact same core. Windows, macOS & Linux, works out of the box.
+**The world's first AC controller with built-in storm safety protection.** When a typhoon or hurricane approaches within 100km, AC-Nexus automatically shuts down all air conditioners to prevent outdoor unit damage from high winds — a feature no other smart home platform offers.
+
+Broadlink + Xiaomi MIoT dual-ecosystem support, Xiaomi's massive code library + built-in **17 common AC brand IR protocols**, plus **IR learning** for any unsupported brand. AI Agents control AC with one line of Python via `import acnexus_core`. Desktop app runs on all platforms — download and go, with a complete user guide that ensures even beginners can get started quickly.
+
+## 📸 Screenshots
+
+| Main Interface | Typhoon & Alerts |
+|----------------|------------------|
+| ![Main](assets/screenshot-main.png) | ![Typhoon](assets/screenshot-typhoon.png) |
+
+| Device Switch (Broadlink / Mijia) | Settings |
+|-----------------------------------|----------|
+| ![Devices](assets/screenshot-devices.png) | ![Settings](assets/screenshot-settings.png) |
 
 ## 🤖 Agent API
 
 ```python
-from acnexus_core import init, send_ac, get_device_list
+from acnexus_core import init, send_ac
 
-# One-time init (auto-persisted to config.json)
 init(api_key="your_key", qw_host="https://your_host",
      location={"lat": 22.54, "lon": 114.05, "name": "Shenzhen"})
 
-# Control AC — brand name auto-resolved to IR protocol
-send_ac("on", "cool", 26, "auto")                    # current device
-send_ac("off", "cool", 26, "auto", mac="e870723f")   # specific device
+send_ac("on", "cool", 26, "auto")                     # control AC
+send_ac("off", "cool", 26, "auto", mac="e870723f")    # specific device
 
-# Multi-device
-for mac, name in get_device_list():
-    print(f"{name}: {mac}")
-
-# Storm threat assessment
+# Storm threat assessment — unique feature
 from acnexus_core import typhoon_threat_distance
 dist, name = typhoon_threat_distance()
 if dist < 100:
-    send_ac("off", "cool", 26, "auto", source="typhoon")  # auto-shutdown near storm
+    send_ac("off", "cool", 26, "auto", source="typhoon")  # auto shutdown
 ```
 
 No GUI needed — `pip install -r requirements-core.txt` is enough.
 
-## 🎯 Supported AC Brands
+## 🎯 Built-in Protocols
 
-The core supports all **17 protocols**, now fully available in the desktop dropdown with brand logos.
+17 AC IR protocols, fully covered in desktop dropdown with clean, recognizable brand logos.
 
-| Brand (CN) | Brand (EN) | Protocol Source |
-|------------|------------|-----------------|
-| 格力 | `gree` | hvac_ir |
-| 美的 / 华凌 / 小米 | `midea` | hvac_ir |
-| 海尔 | `haier` | Custom protocols |
-| 奥克斯 | `aux_ac` | Custom protocols |
-| 海信 | `hisense` | hvac_ir |
-| 大金 | `daikin` | hvac_ir |
-| 三菱 | `mitsubishi` | hvac_ir |
-| 松下 | `panasonic` | Custom protocols |
-| 日立 | `hitachi` | hvac_ir |
-| 富士通 | `fujitsu` | hvac_ir |
-| 巴鲁 | `ballu` | hvac_ir |
-| 开利 | `carriermca` | hvac_ir |
-| 现代 | `hyundai` | hvac_ir |
-| Fuego | `fuego` | hvac_ir |
+| Gree | Midea | Haier | AUX | Hisense | Daikin | Mitsubishi | Panasonic | Hitachi |
+|------|-------|-------|-----|---------|--------|------------|-----------|---------|
+| Fujitsu | Ballu | Carrier | Hyundai | Fuego | — | — | — | — |
 
-Agent can pass either Chinese `brand="日立"` or English `brand="hitachi"` — both resolve automatically.
+**All MIoT-compatible IR devices can be added to the system**, leveraging Xiaomi's massive code library, with full support in both Agent mode and the desktop app.
+
+Agent accepts Chinese or English: `brand="Hitachi"` or `brand="日立"` — auto-resolved.
+**A ready-to-use skill file is included in the project, giving AI Agents complete guidance to unlock the full potential.**
 
 ## ✨ Features
 
-- 📡 **Multi-device** — LAN auto-discovery, dropdown switch, offline label
-- 🎓 **IR Learning** — Teach the system codes from your original remote for any unsupported brand, supporting any mode+temp+fan combination
-- ⏰ **Schedule templates** — Multi-group timers (workdays vs weekends)
-- 🌡️ **Smart temp control** — Adaptive cool/heat based on outdoor temperature; validates custom remote commands when editing rules
-- 🌤️ **Dual weather** — Baidu / QWeather API, one-click switch
-- 🌀 **Dual storm source** — NW Pacific (NMC) + N. Atlantic hurricanes (NHC), path forecast
-- 🌪️ **Storm protection** — Auto-shutdown all ACs when storm < 100km
-- ⚠️ **Alerts** — Storm tracking + local weather warnings, split layout
-- 🎨 **Dark theme** — Light/dark/system, instant apply
-- 📋 **Activity log** — Browse by date
-- 🔧 **Diagnostics** — One-click health check
-
-## Screenshot
-
-
-| main | 
-|--------|
- ![主界面](assets/screenshot-main.png) |
-
-| settings | warning |
-|--------|----------|
- ![设置](assets/screenshot-settings.png) | ![预警信息](assets/screenshot-typhoon.png) |
- 
-## 🧰 Hardware
-
-- Python 3.9+ (macOS / Windows / Linux / Raspberry Pi / NAS)
-- [Broadlink RM series](https://www.broadlink.com.cn/) IR blaster
-
-## 📡 Deploy on OpenWRT Router
-
-> **[AC-Nexus-OpenWRT](https://github.com/oywq00008-cell/AC-Nexus-OpenWRT)** — LuCI control panel + procd daemon + IPK one-click install
-
-Both projects share the core algorithm and IR protocols, evolving independently.
+- 🌪️ **Storm protection** — Auto-shutdown all ACs when storm < 100km away, protecting outdoor units
+- 📡 **Dual ecosystem** — Broadlink RM LAN discovery + Xiaomi MIoT cloud login with QR code
+- 🎓 **IR learning** — Teach the system codes from your original remote for any brand
+- ⏰ **Schedule templates** — Multi-group timers with flexible date and time slot configuration
+- 🌡️ **Smart temp** — Adaptive cooling/heating based on outdoor temperature, fully customizable rules
+- 🌤️ **Dual weather** — Baidu / QWeather API real-time weather + alerts (completely free)
+- 🌀 **Dual storm** — NMC NW Pacific typhoons + NHC Atlantic hurricanes, path forecast chart, covering all major global storm regions
+- 🎨 **Dark theme** — Light / dark / follow system
+- 🔧 **Diagnostics** — One-click environment, dependency & device health check
 
 ## 🚀 Quick Start
 
-### Desktop App
-
 | Platform | Download |
 |----------|----------|
-| 🪟 Windows | [AC-Nexus.exe](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-Windows.zip) |
-| 🍎 macOS | [AC-Nexus.app](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-macOS.zip) |
-| 🐧 Linux | [AC-Nexus-linux](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-linux.tar.gz) |
-
-macOS first run: if you see "unable to verify developer", unzip and open `打不开请看我.txt` first.
+| 🪟 Windows | [AC-Nexus.exe](https://github.com/oywq00008-cell/AC-Nexus/releases/latest/download/AC-Nexus-Windows.zip) |
+| 🍎 macOS | [AC-Nexus.app](https://github.com/oywq00008-cell/AC-Nexus/releases/latest/download/AC-Nexus-macOS.zip) |
+| 🐧 Linux | [AC-Nexus-linux](https://github.com/oywq00008-cell/AC-Nexus/releases/latest/download/AC-Nexus-linux.tar.gz) |
 
 From source:
+
 ```bash
-git clone https://github.com/oywq00008-cell/AC-Nexus-For-Agent.git
-cd AC-Nexus-For-Agent
+git clone https://github.com/oywq00008-cell/AC-Nexus.git
+cd AC-Nexus
 pip install -r requirements.txt
 python ac_controller_pyside6.py
 ```
 
-### Agent / Headless
+## 🧰 Hardware
 
-```bash
-pip install -r requirements-core.txt
-```
+- Python 3.9+
+- [Broadlink RM series](https://www.broadlink.com.cn/) or Xiaomi MIoT IR blaster
 
-```python
-from acnexus_core import init, send_ac
-init()
-send_ac("on", "cool", 26, "auto")
-```
-
-## ⚙️ Configuration
-
-Fill in weather API key via Settings on first run (Baidu 5k/day or QWeather 50k/mo, free). Broadlink devices auto-discovered on LAN. Agent mode: pass via `init()` or edit `~/.ac_controller/config.json` directly.
-
-## 📁 Project Structure
+## 📁 Structure
 
 ```
-ac_controller_pyside6.py      # PySide6 entry point
+ac_controller_pyside6.py      # Entry point
 acnexus_core/             # Core library (zero GUI deps)
-├── __init__.py               # Public API
-├── config.py                 # Config + resolve_brand() + device mgmt + city search
-├── weather.py                # Dual-source weather + alerts
-├── typhoon.py                # Storm (NMC) + Hurricane (NHC) + KMZ forecast
-├── ac_control.py             # AC control + dynamic protocol import + learned codes
-├── ir_learner.py             # IR learning core (learn_one / get_raw_code)
-├── scheduler.py              # Scheduling (multi-group templates)
-├── autostart.py              # Cross-platform auto-start
+├── ac_control.py             # AC control + dynamic protocols
+├── scheduler.py              # Scheduling
+├── typhoon.py                # Dual-source storms
+├── weather.py                # Dual-source weather
+├── ir_learner.py             # IR learning
+├── cloud_auth.py             # Xiaomi cloud auth
+├── xiaomi_cloud.py           # Xiaomi cloud API
+├── xiaomi_local.py           # Xiaomi LAN control
+├── config.py                 # Configuration
 └── logger.py                 # Logging
-acnexus_desktop/          # PySide6 desktop GUI
-├── app_pyside6.py            # Main window + global styles
-└── pyside/                   # UI modules (6 files)
-    ├── ac_tab.py             # AC + Weather + Timer + Rules
-    ├── ty_tab.py             # Storm + Alerts + Forecast chart
-    ├── theme.py              # Theme engine (light/dark/system)
-    ├── settings_dialog.py    # Settings dialog
-    ├── schedule_dialog.py    # Schedule template editor
-    ├── repair_dialog.py      # Diagnostics
-    ├── learn_dialog.py       # IR learning wizard
-    ├── dialogs.py            # Base dialogs + rules + typhoon alert
-    └── _utils.py             # Utilities
+acnexus_desktop/          # PySide6 desktop
+├── app_pyside6.py            # Main window
+└── pyside/                   # UI modules
 protocols/                    # Custom IR protocols
-logos/                        # Brand logos
-fonts/                        # Fonts (HarmonyOS Sans SC)
-icons/                        # SVG icon system
-AC-Nexus.spec              # Windows build
-AC-Nexus-macOS.spec        # macOS build
-AC-Nexus-linux.spec        # Linux build
-requirements.txt              # Full deps
-requirements-core.txt         # Agent-only deps
 ```
 
 ## 🔐 Privacy
@@ -169,12 +111,3 @@ All config stored locally at `~/.ac_controller/`. Nothing uploaded.
 ## 📜 License
 
 MIT License
-
-## 💝 Acknowledgments
-
-- [python-broadlink](https://github.com/mjg59/python-broadlink) — Broadlink RM driver
-- [hvac_ir](https://github.com/nicko858/hvac_ir) — IR protocol library
-- [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ protocol reference
-- [QWeather](https://www.qweather.com) / [Baidu Maps](https://lbsyun.baidu.com) — Weather data
-- [China NMC](https://www.nmc.cn) — Storm data
-- [USA NHC](https://www.nhc.noaa.gov) — Atlantic hurricane data

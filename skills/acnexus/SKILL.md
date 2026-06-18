@@ -23,8 +23,8 @@ Cross-platform AC control library for Broadlink RM series IR blasters and Xiaomi
 ## Quick Start (Agent)
 
 ```bash
-git clone https://github.com/oywq00008-cell/AC-Nexus-For-Agent.git
-cd AC-Nexus-For-Agent
+git clone https://github.com/oywq00008-cell/AC-Nexus.git
+cd AC-Nexus
 pip install -r requirements-core.txt
 ```
 
@@ -358,7 +358,7 @@ _cfg.save_config(_cfg.config)
 
 ## Desktop GUI
 
-Pre-built installers (Windows/macOS/Linux), auto-built by GitHub Actions. Download from [Releases](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest).
+Pre-built installers (Windows/macOS/Linux), auto-built by GitHub Actions. Download from [Releases](https://github.com/oywq00008-cell/AC-Nexus/releases/latest).
 
 ## OpenWRT Router Plugin
 

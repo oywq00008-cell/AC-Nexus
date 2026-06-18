@@ -1,166 +1,107 @@
-# 🎮 AC-Nexus v5.2
+# 🌀 AC-Nexus v5.2
 
 [English](README_EN.md) | 中文
 
-AC-Nexus 不止是一个空调遥控器桌面应用——它是一套**为 AI Agent 而生的红外控制协议栈**。接入博联 RM 红外模块或**任意支持 MIoT 协议的米家红外遥控器**后，任何 AI Agent 只需 `import acnexus_core`，即可用一行 Python 控制空调。内置 **红外学习功能**，用原装遥控器"教"软件发码即可适配列表外的品牌。支持多设备并行调度、室外温度自适应调温、台风路径预报，桌面应用（PySide6）和命令行/Agent 两个模式共享同一套核心，Windows / macOS / Linux 即装即用。
+**全球首款内置风暴安全防护的智能空调控制系统。** 台风逼近时自动关闭所有空调，保护外机不被强风损坏——这是市面上任何空调遥控器或智能家居平台都没有的功能。
+
+博联Broadlink+米家MIoT双生态兼容，米家海量码库+内置**17种常见空调品牌红外协议**，**红外学习**适配任意品牌。AI Agent通过 `import acnexus_core` 一行代码控制空调，桌面应用全平台下载即用，并附带完整的使用指南，保证新手也能快速上手。
+
+## 📸 界面
+
+| 主界面 | 预警信息 |
+|--------|----------|
+| ![主界面](assets/screenshot-main.png) | ![预警信息](assets/screenshot-typhoon.png) |
+
+| 设备切换（博联 / 米家） | 设置 |
+|--------|------|
+| ![设备切换](assets/screenshot-devices.png) | ![设置](assets/screenshot-settings.png) |
 
 ## 🤖 Agent 调用
 
 ```python
-from acnexus_core import init, send_ac, get_device_list
+from acnexus_core import init, send_ac
 
-# 一行初始化（自动保存 config.json）
 init(api_key="你的Key", qw_host="https://你的Host",
      location={"lat": 22.54, "lon": 114.05, "name": "深圳"})
 
-# 控制空调 — 品牌名中英文均可，自动匹配红外协议
-send_ac("on", "cool", 26, "auto")                    # 当前设备
-send_ac("off", "cool", 26, "auto", mac="e870723f")   # 指定设备
+send_ac("on", "cool", 26, "auto")                     # 控制空调
+send_ac("off", "cool", 26, "auto", mac="e870723f")    # 指定设备
 
-# 多设备
-for mac, name in get_device_list():
-    print(f"{name}: {mac}")
-
-# 风暴威胁评估
+# 风暴威胁评估 — 独家功能
 from acnexus_core import typhoon_threat_distance
 dist, name = typhoon_threat_distance()
 if dist < 100:
-    send_ac("off", "cool", 26, "auto", source="台风")  # 风暴临近自动关机
+    send_ac("off", "cool", 26, "auto", source="台风")  # 自动关机
 ```
 
 Agent 无需 GUI，`pip install -r requirements-core.txt` 即可。
 
-> `send_ac` 仅保证开关/模式/温度/风速四个通用能力。若你的空调支持强力、扫风等高级功能，可让 Agent 修改 `acnexus_core/ac_control.py` 添加可选参数透传。
+## 🎯 内置协议
 
-## 🎯 支持的空调品牌
+17种空调红外协议，桌面端全部覆盖，Logo齐全美观，一目了然。
 
-核心支持全部 **17 种** 协议，桌面端下拉菜单现已全部覆盖，Logo 齐全。
+| 格力 | 美的 | 海尔 | 奥克斯 | 海信 | 大金 | 三菱 | 松下 | 日立 |
+|------|------|------|--------|------|------|------|------|------|
+| 富士通 | 巴鲁 | 开利 | 现代 | Fuego | 华凌 | 小米 | — | — |
 
-| 中文名 | 英文 / Agent 传参 | 协议来源 |
-|--------|-------------------|----------|
-| 格力 | `gree` | hvac_ir |
-| 美的 / 华凌 / 小米 | `midea` | hvac_ir |
-| 海尔 | `haier` | 自研 protocols |
-| 奥克斯 | `aux_ac` | 自研 protocols |
-| 海信 | `hisense` | hvac_ir |
-| 大金 | `daikin` | hvac_ir |
-| 三菱 | `mitsubishi` | hvac_ir |
-| 松下 | `panasonic` | 自研 protocols |
-| 日立 | `hitachi` | hvac_ir |
-| 富士通 | `fujitsu` | hvac_ir |
-| 巴鲁 | `ballu` | hvac_ir |
-| 开利 | `carriermca` | hvac_ir |
-| 现代 | `hyundai` | hvac_ir |
-| Fuego | `fuego` | hvac_ir |
+**所有支持米家MIoT的红外设备都能接入软件**，并引用海量码库，无论是Agent完全掌控还是桌面端完善的功能全部适配
 
-Agent 传参 `brand="日立"` 或 `brand="hitachi"` 均可自动解析。
+Agent 传参中文/英文均可：`brand="日立"` 或 `brand="hitachi"` 自动解析
+**项目内含skill，给Agent完整指导，解锁完全体**
 
 ## ✨ 功能
 
-- 📡 **多设备** — 局域网自动发现，下拉切换，离线标注
-- 🎓 **红外学习** — 品牌列表外的空调可用原装遥控器学习发码，支持任意组合（关机/模式+温度+风速）
-- ⏰ **定时模板** — 多日期组独立设置（工作日/周末不同时段）
-- 🌡️ **智能温控** — 室外温度变化自动调整制冷/制热目标；编辑规则时自动检测自定义遥控器指令是否够用
-- 🌤️ **双源天气** — 百度 / 和风，一键切换
-- 🌀 **双源风暴** — 中国中央气象台 (NMC) + 美国飓风中心 (NHC)，路径预报图
-- 🌪️ **风暴保护** — 距离 < 100km 自动关闭所有空调
-- ⚠️ **预警信息** — 风暴监测 + 当地天气预警，左右分栏
-- 🎨 **深色主题** — 浅色/深色/跟随系统，选择即生效
-- 📋 **操作日志** — 按日期检索
-- 🔧 **故障诊断** — 自动检测环境和设备
-
-## 📸 界面截图
-
-| 主界面 | 
-|--------|
- ![主界面](assets/screenshot-main.png) |
-
-| 设置 | 预警信息 |
-|--------|----------|
- ![设置](assets/screenshot-settings.png) | ![预警信息](assets/screenshot-typhoon.png) |
-
-## 🧰 硬件要求
-
-- Python 3.9+（macOS / Windows / Linux / 树莓派 / NAS）
-- [Broadlink RM 系列](https://www.broadlink.com.cn/) 红外遥控器
-
-## 📡 部署到 OpenWRT 路由器
-
-> **[AC-Nexus-OpenWRT](https://github.com/oywq00008-cell/AC-Nexus-OpenWRT)** — LuCI 控制面板 + procd 守护 + IPK 一键安装
-
-两项目共享核心算法和红外协议，独立进化。
+- 🌪️ **风暴保护** — 台风 / 飓风距离 < 100km 自动关闭所有空调，保护外机
+- 📡 **双生态设备** — 博联 RM 局域网发现 + 米家 MIoT 云登录扫码添加
+- 🎓 **红外学习** — 用原装遥控器教软件发码，适配任意品牌
+- ⏰ **定时模板** — 多日期组独立设置（工作日 / 周末不同时段），可自由设置日期和时段
+- 🌡️ **智能温控** — 室外温度变化自动调温，规则灵活编辑
+- 🌤️ **双源天气** — 百度 / 和风API实时天气 + 预警（完全免费）
+- 🌀 **双源风暴** — NMC 西北太平洋台风 + NHC 北大西洋飓风，路径预报图，覆盖全球主受灾区
+- 🎨 **深色主题** — 浅色 / 深色 / 跟随系统
+- 🔧 **故障诊断** — 一键检测环境、依赖、设备连接
 
 ## 🚀 快速开始
 
-### 桌面应用
-
 | 平台 | 下载 |
 |------|------|
-| 🪟 Windows | [AC-Nexus.exe](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-Windows.zip) |
-| 🍎 macOS | [AC-Nexus.app](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-macOS.zip) |
-| 🐧 Linux | [AC-Nexus-linux](https://github.com/oywq00008-cell/AC-Nexus-For-Agent/releases/latest/download/AC-Nexus-linux.tar.gz) |
-
-macOS 首次运行如果提示"无法验证开发者"，解压后先看 `打不开请看我.txt`。
+| 🪟 Windows | [AC-Nexus.exe](https://github.com/oywq00008-cell/AC-Nexus/releases/latest/download/AC-Nexus-Windows.zip) |
+| 🍎 macOS | [AC-Nexus.app](https://github.com/oywq00008-cell/AC-Nexus/releases/latest/download/AC-Nexus-macOS.zip) |
+| 🐧 Linux | [AC-Nexus-linux](https://github.com/oywq00008-cell/AC-Nexus/releases/latest/download/AC-Nexus-linux.tar.gz) |
 
 源码运行：
+
 ```bash
-git clone https://github.com/oywq00008-cell/AC-Nexus-For-Agent.git
-cd AC-Nexus-For-Agent
+git clone https://github.com/oywq00008-cell/AC-Nexus.git
+cd AC-Nexus
 pip install -r requirements.txt
 python ac_controller_pyside6.py
 ```
 
-### Agent / 无头模式
+## 🧰 硬件
 
-```bash
-pip install -r requirements-core.txt
-```
+- Python 3.9+
+- [Broadlink RM 系列](https://www.broadlink.com.cn/) 或米家 MIoT 红外遥控器
 
-```python
-from acnexus_core import init, send_ac
-init()
-send_ac("on", "cool", 26, "auto")
-```
-
-## ⚙️ 配置
-
-首次运行后在设置中填入天气 API Key（百度 5,000 次/天或和风 50,000 次/月，免费注册）。博联设备局域网自动扫描。Agent 模式通过 `init()` 传参或直接编辑 `~/.ac_controller/config.json`。
-
-## 📁 项目结构
+## 📁 结构
 
 ```
-ac_controller_pyside6.py      # PySide6 入口
+ac_controller_pyside6.py      # 入口
 acnexus_core/             # 核心库（零 GUI 依赖）
-├── __init__.py               # 公共 API
-├── config.py                 # 配置 + resolve_brand() + 设备管理 + 城市搜索
-├── weather.py                # 双源天气 + 预警
-├── typhoon.py                # 风暴 (NMC) + 飓风 (NHC) + KMZ 预报
-├── ac_control.py             # 空调控制 + 动态协议导入 + 学习码支持
-├── ir_learner.py             # 红外学习核心 (learn_one / get_raw_code)
-├── scheduler.py              # 定时调度（多日期组模板）
-├── autostart.py              # 三平台开机自启
+├── ac_control.py             # 空调控制 + 动态协议
+├── scheduler.py              # 定时调度
+├── typhoon.py                # 双源风暴
+├── weather.py                # 双源天气
+├── ir_learner.py             # 红外学习
+├── cloud_auth.py             # 小米云登录
+├── xiaomi_cloud.py           # 米家云 API
+├── xiaomi_local.py           # 米家局域网
+├── config.py                 # 配置
 └── logger.py                 # 日志
-acnexus_desktop/          # PySide6 桌面 GUI
-├── app_pyside6.py            # 主窗口 + 全局样式
-└── pyside/                   # UI 模块（6 文件）
-    ├── ac_tab.py             # 空调 + 天气 + 定时 + 规则
-    ├── ty_tab.py             # 台风 + 预警 + 预报图
-    ├── theme.py              # 主题引擎（浅色/深色/跟随系统）
-    ├── settings_dialog.py    # 设置对话框
-    ├── schedule_dialog.py    # 定时模板编辑
-    ├── repair_dialog.py      # 故障诊断
-    ├── learn_dialog.py       # 红外学习向导
-    ├── dialogs.py            # 基础对话框 + 规则 + 台风提醒
-    └── _utils.py             # 工具函数
+acnexus_desktop/          # PySide6 桌面
+├── app_pyside6.py            # 主窗口
+└── pyside/                   # UI 模块
 protocols/                    # 自研红外协议
-logos/                        # 品牌 Logo
-fonts/                        # 字体 (HarmonyOS Sans SC)
-icons/                        # SVG 图标系统
-AC-Nexus.spec              # Windows 打包
-AC-Nexus-macOS.spec        # macOS 打包
-AC-Nexus-linux.spec        # Linux 打包
-requirements.txt              # 完整依赖
-requirements-core.txt         # Agent 最小依赖
 ```
 
 ## 🔐 隐私
@@ -170,12 +111,3 @@ requirements-core.txt         # Agent 最小依赖
 ## 📜 协议
 
 MIT License
-
-## 💝 致谢
-
-- [python-broadlink](https://github.com/mjg59/python-broadlink) — 博联 RM 驱动
-- [hvac_ir](https://github.com/nicko858/hvac_ir) — 红外协议库
-- [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ 协议参考
-- [和风天气](https://www.qweather.com) / [百度地图开放平台](https://lbsyun.baidu.com) — 天气数据
-- [中国中央气象台](https://www.nmc.cn) — 风暴数据
-- [NHC](https://www.nhc.noaa.gov) — 北大西洋飓风数据

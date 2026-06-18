@@ -96,7 +96,7 @@ def open_about(parent):
     layout.addWidget(lbl("台风路径预报与预警 | 多时段定时开关 | 智能温控", color="#555", size=11), alignment=QtCore.Qt.AlignCenter)
     layout.addSpacing(16)
 
-    gh_url = "https://github.com/oywq00008-cell/AC-Nexus-For-Agent"
+    gh_url = "https://github.com/oywq00008-cell/AC-Nexus"
     gh_link = QtWidgets.QLabel(f'<a href="{gh_url}" style="color:#2F80ED;">{gh_url}</a>')
     gh_link.setOpenExternalLinks(True)
     gh_link.setStyleSheet("font-size:10px;")

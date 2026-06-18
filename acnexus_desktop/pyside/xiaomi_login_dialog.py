@@ -1,4 +1,5 @@
 """米家云登录弹窗 — 扫码登录"""
+import sys
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from ._utils import lbl, is_dark
@@ -27,8 +28,9 @@ class _LoginSignals(QtCore.QObject):
 def open_xiaomi_login_dialog(parent):
     signals = _LoginSignals()
 
-    dlg = QtWidgets.QDialog(parent, QtCore.Qt.FramelessWindowHint)
-    dlg.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+    dlg = QtWidgets.QDialog(parent, QtCore.Qt.FramelessWindowHint if sys.platform == "win32" else QtCore.Qt.Dialog)
+    if sys.platform == "win32":
+        dlg.setAttribute(QtCore.Qt.WA_TranslucentBackground)
     dlg.setWindowModality(QtCore.Qt.WindowModal)
     dlg.setWindowTitle("米家云登录")
     dlg.resize(390, 400)  # 额外空间给阴影
@@ -41,11 +43,12 @@ def open_xiaomi_login_dialog(parent):
     outer = QtWidgets.QFrame(dlg)
     outer.setObjectName("xiaomi_login_outer")
     outer.setStyleSheet(f"QFrame#xiaomi_login_outer {{ background:{bg}; border:1px solid {bd}; border-radius:12px; }}")
-    shadow = QtWidgets.QGraphicsDropShadowEffect()
-    shadow.setBlurRadius(24)
-    shadow.setOffset(0, 2)
-    shadow.setColor(QtGui.QColor(0, 0, 0, 80))
-    outer.setGraphicsEffect(shadow)
+    if sys.platform == "win32":
+        shadow = QtWidgets.QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(24)
+        shadow.setOffset(0, 2)
+        shadow.setColor(QtGui.QColor(0, 0, 0, 80))
+        outer.setGraphicsEffect(shadow)
     ov = QtWidgets.QVBoxLayout(outer); ov.setContentsMargins(0, 0, 0, 0); ov.setSpacing(0)
 
     # 标题栏
@@ -99,7 +102,7 @@ def open_xiaomi_login_dialog(parent):
     body.addLayout(btn_row)
 
     ov.addLayout(body)
-    full = QtWidgets.QVBoxLayout(dlg); full.setContentsMargins(10, 10, 10, 10); full.addWidget(outer)
+    full = QtWidgets.QVBoxLayout(dlg); full.setContentsMargins(10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0, 10 if sys.platform == "win32" else 0); full.addWidget(outer)
 
     result = {"session": None}
 
