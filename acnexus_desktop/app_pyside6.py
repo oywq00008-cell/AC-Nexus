@@ -171,7 +171,7 @@ class App(QtWidgets.QMainWindow):
         if IS_MAC:
             if not QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
                 return
-            icon_path = str(Path(__file__).resolve().parent.parent / "icons" / "acnexus_statusicon.png")
+            icon_path = self._get_asset("icons/acnexus_statusicon.png")
             if not Path(icon_path).exists():
                 icon_path = self._get_asset("acnexus.png")
             icon = QtGui.QIcon(icon_path)
