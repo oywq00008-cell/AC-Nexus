@@ -174,7 +174,7 @@ class App(QtWidgets.QMainWindow):
             icon_path = self._get_asset("icons/acnexus_statusicon.png")
             if not Path(icon_path).exists():
                 icon_path = self._get_asset("acnexus.png")
-            icon = QtGui.QIcon(icon_path)
+            icon = QtGui.QIcon(str(icon_path))
             menu = QtWidgets.QMenu()
             menu.addAction("退出", self._quit_from_tray)
             self._tray = QtWidgets.QSystemTrayIcon(icon, self)
