@@ -75,6 +75,12 @@ Each provider's devices are fully isolated — separate schedules, temperature r
 ## API Reference
 
 ### Setup
+
+> **First-time: install dependencies**
+> ```bash
+> pip install -r requirements-core.txt
+> ```
+
 | Function | Description |
 |----------|-------------|
 | `init(baidu_key=None, api_key=None, qw_host=None, location=None, brand=None)` | Initialize config + start background scheduler. **Writes to `~/.ac_controller/config.json`**. Idempotent. |
@@ -97,7 +103,7 @@ Each provider's devices are fully isolated — separate schedules, temperature r
 
 **Step 1 — Get session via QR login:**
 ```python
-from acnexus_core.cloud_auth import login_qr
+from acnexus_core.xiaomi_cloud import login_qr
 # In a terminal: prints ASCII QR code automatically
 # In Jupyter/GUI: pass a callback to render the QR image
 session = login_qr()
@@ -238,7 +244,7 @@ send_ac("on", "cool", 25, "auto", mac="e870723f41ee")
 
 ### "Add a new Xiaomi device for the user"
 ```python
-from acnexus_core.cloud_auth import login_qr
+from acnexus_core.xiaomi_cloud import login_qr
 from acnexus_core.xiaomi_cloud import list_devices
 import acnexus_core.config as _cfg
 

@@ -93,7 +93,7 @@ acnexus_core/             # 核心库（零 GUI 依赖）
 ├── typhoon.py                # 双源风暴
 ├── weather.py                # 双源天气
 ├── ir_learner.py             # 红外学习
-├── cloud_auth.py             # 小米云登录
+├── xiaomi_cloud.py            # 小米云扫码登录 + 加密
 ├── xiaomi_cloud.py           # 米家云 API
 ├── xiaomi_local.py           # 米家局域网
 ├── config.py                 # 配置

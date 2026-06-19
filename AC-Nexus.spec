@@ -25,7 +25,7 @@ a = Analysis(
     hiddenimports=[
         'protocols.haier', 'protocols.aux_ac', 'protocols.panasonic',
         'acnexus_core.ir_learner', 'acnexus_core.autostart',
-        'acnexus_core.cloud_auth', 'acnexus_core.xiaomi_cloud', 'acnexus_core.xiaomi_local',
+        'acnexus_core.xiaomi_cloud', 'acnexus_core.xiaomi_local',
         'acnexus_desktop.pyside', 'acnexus_desktop.pyside.ac_tab',
         'acnexus_desktop.pyside.ty_tab', 'acnexus_desktop.pyside.dialogs',
         'acnexus_desktop.pyside._utils',

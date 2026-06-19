@@ -274,12 +274,26 @@ def open_settings(app):
         for inp in dlg.findChildren(QtWidgets.QLineEdit):
             if inp.objectName() == "city_search_input":
                 inp.setStyleSheet(f"QLineEdit {{ color:{'#EEE' if dark else '#333'}; background:{'#3D3D3D' if dark else 'white'}; border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:6px; padding:4px 8px; }}")
+            elif inp.objectName() == "api_key_input":
+                inp.setStyleSheet(f"QLineEdit {{ border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:4px; background:{'#1E1E1E' if dark else 'white'}; color:{'#EEE' if dark else '#333'}; padding:4px 8px; }}")
         # 取消 / 保存按钮（只改颜色，不改尺寸）
         for btn in dlg.findChildren(QtWidgets.QPushButton):
             if btn.objectName() == "settings_cancel_btn":
                 btn.setStyleSheet(f"QPushButton#settings_cancel_btn {{ background:{'#555' if dark else 'white'}; color:{'#DDD' if dark else '#333'}; border:1px solid {'#666' if dark else '#DEDEDE'}; border-radius:8px; font-size:13px; }} QPushButton#settings_cancel_btn:hover {{ background:{'#666' if dark else '#F5F5F5'}; }}")
             elif btn.objectName() == "settings_save_btn":
                 btn.setStyleSheet(f"QPushButton#settings_save_btn {{ background:{'#0076D4' if not dark else '#2F80ED'}; color:white; border:1px solid {'#0076D4' if not dark else '#2F80ED'}; border-radius:8px; font-size:13px; font-weight:500; }} QPushButton#settings_save_btn:hover {{ background:{'#0065B8' if not dark else '#1A6FD8'}; }}")
+            elif btn.objectName() == "settings_tool_btn":
+                btn.setStyleSheet(f"""
+                    QPushButton#settings_tool_btn {{
+                        border:1px solid {'#555' if dark else '#DEDEDE'};
+                        border-radius:6px; padding:4px 10px;
+                        background:{'#3D3D3D' if dark else 'white'};
+                        color:{'#EEE' if dark else '#333'};
+                    }}
+                    QPushButton#settings_tool_btn:hover {{
+                        background:{'#555' if dark else '#F0F0F0'};
+                    }}
+                """)
         # 下拉框（Windows 暗色模式防黑底）
         for combo in dlg.findChildren(QtWidgets.QComboBox):
             combo.setStyleSheet(f"QComboBox {{ background:{'#3D3D3D' if dark else '#FAFAFA'}; color:{'#EEE' if dark else '#333'}; border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:6px; padding:2px 6px; selection-background-color:#2F80ED; selection-color:white; }} QComboBox:hover {{ border-color:{'#777' if dark else '#BBB'}; }}")
@@ -395,6 +409,7 @@ def open_settings(app):
             else: loc_info.setText("定位失败"); loc_info.setStyleSheet("color:#E74C3C;")
         except Exception as e: loc_info.setText("定位失败: " + str(e)); loc_info.setStyleSheet("color:#E74C3C;")
     b = QtWidgets.QPushButton()
+    b.setObjectName("settings_tool_btn")
     b.setIcon(QtGui.QIcon(os.path.join(icons_dir, "location.svg")))
     b.setText(" 自动定位")
     b.clicked.connect(lambda: threading.Thread(target=auto_locate, daemon=True).start())
@@ -414,6 +429,7 @@ def open_settings(app):
     srl.addWidget(city_entry)
     dw = dlg
     search_btn = QtWidgets.QPushButton("  🔍 搜索  ")
+    search_btn.setObjectName("settings_tool_btn")
     def do_search():
         city = city_entry.text().strip()
         if not city: return
@@ -538,6 +554,23 @@ def open_settings(app):
         picker.exec()
     search_btn.clicked.connect(do_search); srl.addWidget(search_btn)
     c2l.addWidget(sr)
+
+    # Windows: 自动定位 & 搜索按钮样式（macOS/Linux 原生已带边框）
+    if sys.platform == "win32":
+        _btn_dark = _is_dark()
+        _tool_btn_qss = f"""
+            QPushButton#settings_tool_btn {{
+                border:1px solid {'#555' if _btn_dark else '#DEDEDE'};
+                border-radius:6px; padding:4px 10px;
+                background:{'#3D3D3D' if _btn_dark else 'white'};
+                color:{'#EEE' if _btn_dark else '#333'};
+            }}
+            QPushButton#settings_tool_btn:hover {{
+                background:{'#555' if _btn_dark else '#F0F0F0'};
+            }}
+        """
+        b.setStyleSheet(_tool_btn_qss)
+        search_btn.setStyleSheet(_tool_btn_qss)
     swl.addWidget(card2)
 
     # ── 3. 天气 API ──
@@ -556,13 +589,26 @@ def open_settings(app):
     bd_frame = QtWidgets.QWidget(); bdl = QtWidgets.QVBoxLayout(bd_frame); bdl.setContentsMargins(0, 0, 0, 0)
     bd_entry = QtWidgets.QLineEdit(_cfg.config.get("baidu_key", ""))
     bd_entry.setPlaceholderText("百度 API Key"); bd_entry.setEchoMode(QtWidgets.QLineEdit.Password)
+    bd_entry.setObjectName("api_key_input")
+    # Windows 深色适配：输入框边框 + 背景 + 文字（macOS/Linux 原生风格自带边框）
+    if sys.platform == "win32":
+        _dark = _is_dark()
+        _le_bd = "#555" if _dark else "#DEDEDE"
+        _le_bg = "#1E1E1E" if _dark else "white"
+        _le_fg = "#EEE" if _dark else "#333"
+        _le_qss = f"QLineEdit {{ border:1px solid {_le_bd}; border-radius:4px; background:{_le_bg}; color:{_le_fg}; padding:4px 8px; }}"
+    else:
+        _le_qss = ""
+    bd_entry.setStyleSheet(_le_qss)
     bdl.addWidget(bd_entry); bdl.addWidget(lbl("每天 5,000 次调用", color="gray"), alignment=QtCore.Qt.AlignCenter); c3l.addWidget(bd_frame)
 
     qw_frame = QtWidgets.QWidget(); qwl = QtWidgets.QVBoxLayout(qw_frame); qwl.setContentsMargins(0, 0, 0, 0)
     qw_key = QtWidgets.QLineEdit(_cfg.QW_KEY)
-    qw_key.setPlaceholderText("和风 API Key"); qw_key.setEchoMode(QtWidgets.QLineEdit.Password); qwl.addWidget(qw_key)
+    qw_key.setPlaceholderText("和风 API Key"); qw_key.setEchoMode(QtWidgets.QLineEdit.Password); qw_key.setObjectName("api_key_input"); qwl.addWidget(qw_key)
+    qw_key.setStyleSheet(_le_qss)
     qw_host = QtWidgets.QLineEdit(_cfg.QW_HOST)
-    qw_host.setPlaceholderText("https://xxx.re.qweatherapi.com"); qwl.addWidget(qw_host)
+    qw_host.setPlaceholderText("https://xxx.re.qweatherapi.com"); qw_host.setObjectName("api_key_input"); qwl.addWidget(qw_host)
+    qw_host.setStyleSheet(_le_qss)
     qwl.addWidget(lbl("免费订阅需填入个人 Host 地址", color="gray"), alignment=QtCore.Qt.AlignCenter); c3l.addWidget(qw_frame)
 
     if "和风" in provider_cb.currentText(): bd_frame.hide()

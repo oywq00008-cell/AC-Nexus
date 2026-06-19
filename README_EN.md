@@ -93,7 +93,7 @@ acnexus_core/             # Core library (zero GUI deps)
 ├── typhoon.py                # Dual-source storms
 ├── weather.py                # Dual-source weather
 ├── ir_learner.py             # IR learning
-├── cloud_auth.py             # Xiaomi cloud auth
+├── xiaomi_cloud.py            # Xiaomi QR login + crypto
 ├── xiaomi_cloud.py           # Xiaomi cloud API
 ├── xiaomi_local.py           # Xiaomi LAN control
 ├── config.py                 # Configuration

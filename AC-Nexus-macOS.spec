@@ -23,7 +23,7 @@ a = Analysis(
     ],
     hiddenimports=[
         'protocols.haier', 'protocols.aux_ac', 'protocols.panasonic',
-        'acnexus_core.ir_learner', 'acnexus_core.autostart','acnexus_core.cloud_auth','acnexus_core.xiaomi_cloud','acnexus_core.xiaomi_local',
+        'acnexus_core.ir_learner', 'acnexus_core.autostart','acnexus_core.xiaomi_cloud','acnexus_core.xiaomi_local',
         'acnexus_desktop.pyside', 'acnexus_desktop.pyside.ac_tab',
         'acnexus_desktop.pyside.ty_tab', 'acnexus_desktop.pyside.dialogs',
         'acnexus_desktop.pyside._utils',
@@ -32,7 +32,7 @@ a = Analysis(
         'acnexus_desktop.pyside.schedule_dialog',
         'acnexus_desktop.pyside.repair_dialog',
         'acnexus_desktop.pyside.learn_dialog',
-        'acnexus_desktop.pyside.brand_dialog','acnexus_desktop.pyside.xiaomi_login_dialog','acnexus_desktop.pyside.xiaomi_device_picker','schedule','python-miio','qrcode','Pillow','pycryptodome','keyring','requests',
+        'acnexus_desktop.pyside.brand_dialog','acnexus_desktop.pyside.xiaomi_login_dialog','acnexus_desktop.pyside.xiaomi_device_picker','schedule','python-miio','qrcode','Pillow','pycryptodome','requests',
     ] + pyside_hidden + collect_submodules('hvac_ir'),
     hookspath=[],
     hooksconfig={},

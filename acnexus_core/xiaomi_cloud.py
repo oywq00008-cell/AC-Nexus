@@ -1,35 +1,49 @@
-"""小米云 MIoT 命令下发模块
-基于 token_extractor 的认证逻辑，通过云 API 控制空调伴侣
+"""小米云模块 — 扫码登录 + 云 API 加密工具 + 设备列表拉取
+
+用法:
+    # 扫码登录
+    from acnexus_core.xiaomi_cloud import login_qr
+    session = login_qr()
+
+    # 云 API 加密
+    from acnexus_core.xiaomi_cloud import signed_nonce, generate_nonce
 """
-import time
+
 import json
 import hashlib
 import hmac
 import base64
+import random
+import time
 import requests
 from Crypto.Cipher import ARC4
 
-# ── 从 token_extractor.py 复用的加密/认证工具 ──
+
+# ── 加密/认证工具（供 xiaomi_device_picker 拉设备列表用）──
 
 def signed_nonce(ssecurity, nonce):
     h = hashlib.sha256(base64.b64decode(ssecurity) + base64.b64decode(nonce))
     return base64.b64encode(h.digest()).decode()
 
+
 def generate_nonce(millis):
     """8字节随机 + 4字节分钟时间戳"""
-    import random, os
+    import os
     nonce_bytes = os.urandom(8) + (int(millis / 60000)).to_bytes(4, byteorder='big')
     return base64.b64encode(nonce_bytes).decode()
+
 
 def encrypt_rc4(password_b64, payload):
     r = ARC4.new(base64.b64decode(password_b64))
     r.encrypt(bytes(1024))
     return base64.b64encode(r.encrypt(payload.encode())).decode()
 
+
 def decrypt_rc4(password_b64, payload):
     r = ARC4.new(base64.b64decode(password_b64))
     r.encrypt(bytes(1024))
     return r.encrypt(base64.b64decode(payload)).decode()
+
 
 def generate_enc_signature(url, method, signed_nonce, params):
     sig = [method.upper(), url.split("com")[1].replace("/app/", "/")]
@@ -40,141 +54,111 @@ def generate_enc_signature(url, method, signed_nonce, params):
         hashlib.sha1("&".join(sig).encode("utf-8")).digest()
     ).decode()
 
-# ── 云控制器 ──
 
-class XiaomiCloudController:
-    """登录小米云 → 下发 MIoT 命令"""
+# ── 扫码登录内部工具 ──
 
-    def __init__(self, username: str, password: str, country: str = "cn"):
-        self.username = username
-        self.password = password
-        self.country = country
-        self.session = requests.Session()
-        self._ssecurity = None
-        self._serviceToken = None
-        self.userId = None
+def _agent() -> str:
+    agent_id = "".join(chr(random.randint(65, 69)) for _ in range(13))
+    random_text = "".join(chr(random.randint(97, 122)) for _ in range(18))
+    return f"{random_text}-{agent_id} APP/com.xiaomi.mihome APPV/10.5.201"
 
-    # ── 登录 (简化版，复用 token_extractor 思路) ──
 
-    def login(self) -> bool:
-        """用户名密码登录，获取 serviceToken"""
-        agent = "AND-3.29.44 APP/com.xiaomi.mihome APPV/10.5.201"
-        # Step 1: 获取 sign
-        r = self.session.get(
-            "https://account.xiaomi.com/pass/serviceLogin",
-            params={"sid": "xiaomiio", "_json": "true"},
-            headers={"User-Agent": agent}
-        )
-        data = json.loads(r.text.replace("&&&START&&&", ""))
-        self._sign = data.get("_sign")
-        if not self._sign:
-            return False
+def _to_json(text: str) -> dict:
+    return json.loads(text.replace("&&&START&&&", ""))
 
-        # Step 2: 登录
-        r = self.session.post(
-            "https://account.xiaomi.com/pass/serviceLoginAuth2",
-            data={
-                "sid": "xiaomiio",
-                "hash": hashlib.md5(self.password.encode()).hexdigest().upper(),
-                "user": self.username,
-                "_sign": self._sign,
-                "_json": "true",
-            },
-            headers={"User-Agent": agent}
-        )
-        data = json.loads(r.text.replace("&&&START&&&", ""))
-        self._ssecurity = data.get("ssecurity")
-        self._location = data.get("location")
-        self.userId = str(data.get("userId", ""))
-        if not self._ssecurity or not self._location:
-            return False
 
-        # Step 3: 获取 serviceToken
-        r = self.session.get(self._location, headers={"User-Agent": agent})
-        self._serviceToken = r.cookies.get("serviceToken")
-        if not self._serviceToken:
-            return False
+def _print_qr_terminal(url: str):
+    """在终端打印 ASCII 二维码，供无 GUI 环境（Agent/SSH）扫码"""
+    try:
+        import qrcode
+        qr = qrcode.QRCode()
+        qr.add_data(url)
+        print("\n📱 请用米家 App 扫描下方二维码登录：\n")
+        qr.print_ascii(invert=True)
+        print(f"\n（如终端不支持二维码，请浏览器打开：{url}）\n")
+    except ImportError:
+        print(f"\n📱 请用米家 App 扫码登录。打开浏览器访问：\n{url}\n")
 
-        # 装 cookie
-        for d in [".api.io.mi.com", ".io.mi.com", ".mi.com"]:
-            self.session.cookies.set("serviceToken", self._serviceToken, domain=d)
-        return True
 
-    # ── 云 API 调用 ──
+# ── 扫码登录 ──
 
-    def _api_url(self, path: str) -> str:
-        prefix = "" if self.country == "cn" else self.country + "."
-        return f"https://{prefix}api.io.mi.com/app{path}"
+def login_qr(qr_callback=None) -> dict:
+    """
+    扫码登录小米云（无需密码/验证码）。
 
-    def _call_encrypted(self, url: str, data: dict) -> dict:
-        """带 RC4 加密的云 API 请求"""
-        millis = round(time.time() * 1000)
-        nonce = generate_nonce(millis)
-        snonce = signed_nonce(self._ssecurity, nonce)
+    参数:
+        qr_callback: fn(qr_png: bytes|None, login_url: str) -> None
 
-        params = {"data": json.dumps(data)}
-        sign = generate_enc_signature(url, "POST", snonce, params)
-        params["rc4_hash__"] = sign
-        for k, v in params.items():
-            params[k] = encrypt_rc4(snonce, v)
+    返回: {"ssecurity": str, "serviceToken": str, "userId": str}
+    失败抛出 RuntimeError。
+    """
+    session = requests.Session()
 
-        fields = {
-            **params,
-            "signature": generate_enc_signature(url, "POST", snonce, params),
-            "ssecurity": self._ssecurity,
-            "_nonce": nonce,
-        }
+    # Step 1: 获取二维码 URL 和长轮询 URL
+    r = session.get(
+        "https://account.xiaomi.com/longPolling/loginUrl",
+        params={
+            "_qrsize": "480",
+            "qs": "%3Fsid%3Dxiaomiio%26_json%3Dtrue",
+            "callback": "https://sts.api.io.mi.com/sts",
+            "_hasLogo": "false",
+            "sid": "xiaomiio",
+            "serviceParam": "",
+            "_locale": "en_GB",
+            "_dc": str(int(time.time() * 1000)),
+        },
+        timeout=15,
+    )
+    if r.status_code != 200:
+        raise RuntimeError(f"QR Step1 失败 (HTTP {r.status_code})")
+    data = _to_json(r.text)
+    login_page_url = data.get("loginUrl")
+    long_poll_url = data.get("lp")
+    timeout_sec = data.get("timeout", 600)
 
-        headers = {
-            "User-Agent": "AND-3.29.44 APP/com.xiaomi.mihome APPV/10.5.201",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "x-xiaomi-protocal-flag-cli": "PROTOCAL-HTTP2",
-            "MIOT-ENCRYPT-ALGORITHM": "ENCRYPT-RC4",
-        }
-        cookies = {
-            "userId": self.userId,
-            "serviceToken": self._serviceToken,
-            "locale": "zh_CN",
-        }
+    if not long_poll_url:
+        raise RuntimeError("QR 登录初始化失败")
 
-        r = self.session.post(url, headers=headers, cookies=cookies, params=fields)
+    # 展示链接 / 终端二维码
+    if qr_callback:
+        qr_callback(None, login_page_url or "")
+    elif login_page_url:
+        _print_qr_terminal(login_page_url)
+
+    # Step 2: 长轮询等待扫码
+    headers = {"User-Agent": _agent()}
+    start = time.time()
+    while True:
+        try:
+            r = session.get(long_poll_url, headers=headers, timeout=20)
+        except requests.exceptions.Timeout:
+            if time.time() - start > timeout_sec:
+                raise RuntimeError("扫码超时，请重试")
+            continue
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"轮询异常: {e}")
+
         if r.status_code == 200:
-            return json.loads(decrypt_rc4(signed_nonce(self._ssecurity, fields["_nonce"]), r.text))
-        raise Exception(f"API error: {r.status_code} {r.text[:200]}")
+            break
+        if time.time() - start > timeout_sec:
+            raise RuntimeError("扫码超时，请重试")
 
-    def set_properties(self, did: str, props: list) -> dict:
-        """
-        通过云 API 设置 MIoT 属性
-        props: [{"siid": 2, "piid": 1, "value": False}, ...]
-        siid/piid 映射见 miio2miot_specs:
-          空调控制 (siid=2):
-            piid=1: power  (True/False)
-            piid=2: mode   (0=auto, 1=cool, 2=dry, 3=heat, 4=wind)
-            piid=3: tar_temp (16-30)
-          风扇 (siid=3):
-            piid=1: fan_level (0=auto_fan, 1=small_fan, 2=medium_fan, 3=large_fan)
-        """
-        url = self._api_url("/miotspec/prop/set")
-        return self._call_encrypted(url, {"params": [{"did": did, **p} for p in props]})
+    resp = _to_json(r.text)
+    ssecurity = resp.get("ssecurity", "")
+    userId = resp.get("userId", "")
+    location_url = resp.get("location", "")
 
-    def get_properties(self, did: str, props: list) -> dict:
-        """读取 MIoT 属性"""
-        url = self._api_url("/miotspec/prop/get")
-        return self._call_encrypted(url, {"params": [{"did": did, **p} for p in props]})
+    if not ssecurity:
+        raise RuntimeError("扫码登录失败：未获取到凭证")
 
+    # Step 4: 获取 serviceToken
+    r = session.get(location_url, headers=headers, timeout=15)
+    serviceToken = r.cookies.get("serviceToken")
+    if not serviceToken:
+        raise RuntimeError("QR Step4 失败：无法获取 serviceToken")
 
-# ── AC 控制快捷方法 ──
-
-def build_ac_command(power: bool = None, mode: int = None,
-                     temp: int = None, fan: int = None) -> list:
-    """构建空调控制指令列表"""
-    cmds = []
-    if power is not None:
-        cmds.append({"siid": 2, "piid": 1, "value": power})
-    if mode is not None:
-        cmds.append({"siid": 2, "piid": 2, "value": mode})
-    if temp is not None:
-        cmds.append({"siid": 2, "piid": 3, "value": temp})
-    if fan is not None:
-        cmds.append({"siid": 3, "piid": 1, "value": fan})
-    return cmds
+    return {
+        "ssecurity": str(ssecurity),
+        "serviceToken": str(serviceToken),
+        "userId": str(userId),
+    }

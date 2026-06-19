@@ -147,7 +147,7 @@ def open_xiaomi_login_dialog(parent):
 
     def do_login():
         try:
-            from acnexus_core.cloud_auth import login_qr
+            from acnexus_core.xiaomi_cloud import login_qr
 
             def show_qr(qr_png, login_url):
                 if login_url:
