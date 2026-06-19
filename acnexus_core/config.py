@@ -296,41 +296,71 @@ def search_cities(name):
 
 
 def _migrate_v6_nested():
-    """v6 迁移：扁平 devices(type字段区分) → 嵌套品牌子字典。
-    同时清理历史残留：设备出现在多个 provider → 只保留字段最多的那一份。"""
+    """v6 迁移：扁平 devices → 嵌套品牌子字典。
+
+    自动识别旧版扁平格式（设备条目直接挂在 devices 下），迁移到新版嵌套格式
+    （devices[品牌名][设备ID]）。同时清理历史残留：同一设备出现在多个 provider
+    时只保留字段最多的那一份。
+    """
     devs = config.get("devices", {})
     if not devs:
         return False
+
     changed = False
-    is_nested = False
-    for key in list(devs.keys()):
-        if isinstance(devs[key], dict) and "type" not in devs[key]:
-            is_nested = True
-            break
-    if not is_nested:
-        # 扁平 → 嵌套
-        new_devs = {}
-        for device_id, dev in list(devs.items()):
-            dev_type = dev.pop("type", "broadlink") or "broadlink"
-            new_devs.setdefault(dev_type, {})[device_id] = dev
-        config["devices"] = new_devs
-        changed = True
-    # 清理历史 ghost：同一 device_id 出现于多个 provider → 只保留字段最多的
-    devs = config.get("devices", {})
-    all_ids = {}
-    for p, sub in devs.items():
-        if not isinstance(sub, dict):
+
+    # ── 1. 收集扁平设备条目 ──
+    # 特征：值是 dict，且顶层有 host/mac/port 等设备配置键（而非子设备 dict）
+    flat_entries = {}  # {device_id: device_data}
+    for key, value in list(devs.items()):
+        if not isinstance(value, dict):
+            # 非 dict 的值直接删除
+            del devs[key]
+            changed = True
             continue
-        for did in sub:
+        # 判断是设备条目还是 provider 容器
+        if "host" in value or "mac" in value or "port" in value:
+            flat_entries[key] = value
+
+    # ── 2. 迁移扁平条目 → 嵌套 ──
+    for device_id, device_data in flat_entries.items():
+        # 检查该设备是否已存在于某个 provider 中
+        found_in = None
+        for p, sub in devs.items():
+            if isinstance(sub, dict) and device_id in sub:
+                found_in = p
+                break
+
+        if found_in:
+            # 已在嵌套结构中 → 扁平版本是幽灵，直接删除
+            del devs[device_id]
+            changed = True
+        else:
+            # 未在嵌套结构中 → 迁移
+            provider = device_data.pop("type", None) or "broadlink"
+            devs.setdefault(provider, {})[device_id] = device_data
+            del devs[device_id]
+            changed = True
+
+    # ── 3. 清理重复设备（同一设备出现在多个 provider）──
+    # 保留字段最多的版本（通常是最新的），删除其他
+    all_ids = {}
+    for p, sub in list(devs.items()):
+        if not isinstance(sub, dict):
+            del devs[p]
+            changed = True
+            continue
+        for did in list(sub.keys()):
             all_ids.setdefault(did, []).append(p)
+
     for did, providers in all_ids.items():
         if len(providers) <= 1:
             continue
-        best_p = max(providers, key=lambda p: len(devs[p][did]))
+        best_p = max(providers, key=lambda p: len(devs[p].get(did, {})))
         for p in providers:
-            if p != best_p:
+            if p != best_p and did in devs.get(p, {}):
                 del devs[p][did]
                 changed = True
+
     return changed
 
 
