@@ -66,7 +66,7 @@ def get_last_ac_state():
     OFF_WORDS = ("手动关机", "定时关机", "自动关机", "关机")
 
     dt = datetime.now()
-    for _ in range(30):  # 最多往回找 30 天
+    for _ in range(7):  # 最多往回找 7 天（定时模板最长周期为7天）
         date_str = dt.strftime("%Y-%m-%d")
         log_file = LOG_DIR / f"{date_str}.md"
         dt -= timedelta(days=1)

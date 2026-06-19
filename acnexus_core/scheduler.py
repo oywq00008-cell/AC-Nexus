@@ -32,7 +32,10 @@ def resume_scheduler():
 
 
 def _device_online(mac):
-    """判断设备最近是否在线"""
+    """判断设备最近是否在线。米家设备始终视为在线（走 MIoT 协议）。"""
+    provider, _ = _cfg.find_device(mac)
+    if provider == "xiaomi_cloud":
+        return True
     return not _cfg._online_macs or mac in _cfg._online_macs
 
 

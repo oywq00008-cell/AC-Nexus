@@ -168,7 +168,21 @@ class App(QtWidgets.QMainWindow):
             QtCore.QUrl("https://github.com/oywq00008-cell/AC-Nexus")))
 
     def _setup_tray(self):
-        if IS_MAC: return
+        if IS_MAC:
+            if not QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
+                return
+            icon_path = str(Path(__file__).resolve().parent.parent / "icons" / "acnexus_statusicon.png")
+            if not Path(icon_path).exists():
+                icon_path = self._get_asset("acnexus.png")
+            icon = QtGui.QIcon(icon_path)
+            menu = QtWidgets.QMenu()
+            menu.addAction("退出", self._quit_from_tray)
+            self._tray = QtWidgets.QSystemTrayIcon(icon, self)
+            self._tray.setContextMenu(menu)
+            self._tray.setToolTip(APP_NAME)
+            self._tray.activated.connect(self._on_tray_activated)
+            self._tray.show()
+            return
         try:
             import pystray; from PIL import Image
             # Windows 用 ICO（支持透明），其他平台用 PNG
@@ -187,13 +201,27 @@ class App(QtWidgets.QMainWindow):
         return Path(__file__).resolve().parent.parent / filename
 
     def closeEvent(self, event):
-        if IS_MAC: event.accept()
-        else: self.hide(); event.ignore()
+        if IS_MAC:
+            if hasattr(self, '_tray') and self._tray:
+                self.hide(); event.ignore()
+            else:
+                event.accept()
+        else:
+            self.hide(); event.ignore()
 
     def _restore_from_tray(self):
         self._ui(lambda: [self.show(), self.raise_(), self.activateWindow()])
+    def _on_tray_activated(self, reason):
+        if reason == QtWidgets.QSystemTrayIcon.ActivationReason.Trigger:
+            self._restore_from_tray()
     def _quit_from_tray(self):
         import os, threading
+        if IS_MAC:
+            if hasattr(self, '_tray') and self._tray:
+                self._tray.hide()
+                self._tray = None
+            QtWidgets.QApplication.quit()
+            return
         if hasattr(self, '_tray') and self._tray:
             self._tray.stop()
             self._tray = None
