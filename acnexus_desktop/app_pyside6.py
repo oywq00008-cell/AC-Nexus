@@ -513,6 +513,8 @@ class App(QtWidgets.QMainWindow):
                 spec = fetch_miot_spec(dev["model"])
                 if spec:
                     dev["miot_spec"] = spec
+                    if did == _cfg.config.get("current_device_mac"):
+                        _cfg.config["miot_spec"] = spec  # 同步扁平键
                     needs_save = True
                     if len(spec) < 4:
                         partials += 1

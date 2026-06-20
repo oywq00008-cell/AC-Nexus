@@ -404,6 +404,8 @@ def init(api_key=None, qw_host=None, location=None, brand=None):
                         spec = fetch_miot_spec(dev["model"])
                         if spec:
                             dev["miot_spec"] = spec
+                            if did == config.get("current_device_mac"):
+                                config["miot_spec"] = spec  # 同步扁平键，防止 save_config 倒灌
                             needs_save = True
                     except Exception:
                         pass
