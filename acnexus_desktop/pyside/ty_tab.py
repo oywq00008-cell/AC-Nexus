@@ -32,6 +32,14 @@ def _draw_forecast_chart(detail, dist, dark=False):
     range_lat = max_lat - min_lat or 0.1
     range_lon = max_lon - min_lon or 0.1
 
+    # 坐标范围向外扩展 15%，防止标注贴在边缘被切
+    pad_lat = range_lat * 0.15
+    pad_lon = range_lon * 0.15
+    min_lat -= pad_lat; max_lat += pad_lat
+    min_lon -= pad_lon; max_lon += pad_lon
+    range_lat = max_lat - min_lat
+    range_lon = max_lon - min_lon
+
     def geo2cv(lat, lon):
         x = 30 + (lon - min_lon) / range_lon * 280
         y = 10 + (max_lat - lat) / range_lat * 85
@@ -46,39 +54,71 @@ def _draw_forecast_chart(detail, dist, dark=False):
                     int(geo2cv(fc_pts[i+1][0], fc_pts[i+1][1])[0]),
                     int(geo2cv(fc_pts[i+1][0], fc_pts[i+1][1])[1]))
 
-    # 当前 → 你家连线 + 距离标注
+    # 当前 → 你家连线（橙色虚线，中断放距离文字）
     x0, y0 = geo2cv(detail["lat"], detail["lon"])
     x1, y1 = geo2cv(loc_lat, loc_lon)
-    p.setPen(QtGui.QPen(QtGui.QColor("#E67E22"), 1, QtCore.Qt.DashLine))
-    p.drawLine(int(x0), int(y0), int(x1), int(y1))
     mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+
+    dist_text = f"{dist}km"
+    p.setFont(QtGui.QFont("", 8, QtGui.QFont.Bold))
+    fm = QtGui.QFontMetrics(p.font())
+    text_w = fm.horizontalAdvance(dist_text)
+    text_h = fm.height()
+    gap = text_w + 6  # 线断开宽度
+
+    # 计算线段方向 → 从中点向两端各退 gap/2
+    dx, dy = x1 - x0, y1 - y0
+    length = (dx**2 + dy**2)**0.5 or 1
+    ux, uy = dx / length, dy / length
+
+    orange_pen = QtGui.QPen(QtGui.QColor("#E67E22"), 1, QtCore.Qt.DashLine)
+    p.setPen(orange_pen)
+    # 线段1: 起点 → 中点前 gap/2
+    p.drawLine(int(x0), int(y0), int(mx - ux * gap / 2), int(my - uy * gap / 2))
+    # 线段2: 中点后 gap/2 → 终点
+    p.drawLine(int(mx + ux * gap / 2), int(my + uy * gap / 2), int(x1), int(y1))
+
+    # 距离文字（橙色加粗，白色半透明背景防遮挡）
+    bg_rect = QtCore.QRectF(mx - text_w / 2 - 2, my - text_h / 2 - 1,
+                            text_w + 4, text_h + 2)
+    p.setPen(QtCore.Qt.NoPen)
+    p.setBrush(QtGui.QColor(255, 255, 255, 200) if not dark else QtGui.QColor(40, 40, 40, 200))
+    p.drawRoundedRect(bg_rect, 3, 3)
     p.setPen(QtGui.QColor("#E67E22"))
-    p.setFont(QtGui.QFont("", 8))
-    p.drawText(int(mx - 40), int(my - 18), 80, 14, QtCore.Qt.AlignCenter, f"{dist}km")
+    p.drawText(int(mx - text_w / 2), int(my - text_h / 2 + fm.ascent()),
+               dist_text)
 
     # 画预报点 + 标注
     for i, (lat, lon, label) in enumerate(fc_pts):
         x, y = geo2cv(lat, lon)
         if i == 0:
-            p.setFont(QtGui.QFont("", 12))
+            # 台风符号
+            fam = QtGui.QFont("", 12)
+            fm2 = QtGui.QFontMetrics(fam)
+            sym_w = fm2.horizontalAdvance("🌀")
+            p.setFont(fam)
             p.setPen(QtGui.QColor("#333"))
-            p.drawText(int(x - 10), int(y + 4), 20, 16, QtCore.Qt.AlignCenter, "🌀")
+            p.drawText(int(x - sym_w / 2), int(y + fm2.ascent() / 2), "🌀")
         else:
+            # 预报点小圆
             p.setBrush(QtGui.QColor("#888"))
             p.setPen(QtCore.Qt.NoPen)
             p.drawEllipse(QtCore.QPointF(x, y), 3, 3)
+        # 预报标注（灰色小字，右下方）
         p.setPen(QtGui.QColor("#999"))
         p.setFont(QtGui.QFont("", 8))
-        p.drawText(int(x - 20), int(y - 16), 40, 12, QtCore.Qt.AlignCenter, label)
+        lw = QtGui.QFontMetrics(p.font()).horizontalAdvance(label)
+        p.drawText(int(x - lw / 2), int(y + 14), label)
 
-    # 画你家
+    # 画你家（蓝色圆点 + 地名）
     xh, yh = geo2cv(loc_lat, loc_lon)
     p.setBrush(QtGui.QColor("#3498DB"))
     p.setPen(QtCore.Qt.NoPen)
     p.drawEllipse(QtCore.QPointF(xh, yh), 3, 3)
     p.setPen(QtGui.QColor("#3498DB"))
-    p.setFont(QtGui.QFont("", 8))
-    p.drawText(int(xh - 20), int(yh - 14), 40, 12, QtCore.Qt.AlignCenter, loc_name)
+    p.setFont(QtGui.QFont("", 8, QtGui.QFont.Bold))
+    nw = QtGui.QFontMetrics(p.font()).horizontalAdvance(loc_name)
+    p.drawText(int(xh - nw / 2), int(yh - 8), loc_name)
 
     p.end()
     return pix
