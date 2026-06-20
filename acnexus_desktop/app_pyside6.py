@@ -493,12 +493,11 @@ class App(QtWidgets.QMainWindow):
             self.statusBar().showMessage(f"✅ 已添加 {len(dids)} 个米家设备", 4000)
 
     def _ensure_miot_spec(self):
-        """当前米家设备缺 miot_spec 时，后台拉取并冻结发送按钮"""
-        mac = _cfg.config.get("current_device_mac", "")
-        provider, dev = _cfg.find_device(mac)
-        if provider != "xiaomi_cloud":
-            return
-        if dev.get("miot_spec") or not dev.get("model"):
+        """遍历所有米家设备，为缺少 miot_spec 的后台补拉并冻结发送按钮"""
+        devs = _cfg.config.get("devices", {}).get("xiaomi_cloud", {})
+        missing = [(did, dev) for did, dev in devs.items()
+                   if isinstance(dev, dict) and not dev.get("miot_spec") and dev.get("model")]
+        if not missing:
             return
         # 冻结发送按钮
         if hasattr(self, '_send_btn') and self._send_btn:
@@ -508,16 +507,26 @@ class App(QtWidgets.QMainWindow):
         def _fetch():
             from acnexus_core.xiaomi_local import fetch_miot_spec
             from acnexus_core.config import save_config
-            spec = fetch_miot_spec(dev["model"])
-            if spec:
-                dev["miot_spec"] = spec
+            needs_save = False
+            partials = 0
+            for did, dev in missing:
+                spec = fetch_miot_spec(dev["model"])
+                if spec:
+                    dev["miot_spec"] = spec
+                    needs_save = True
+                    if len(spec) < 4:
+                        partials += 1
+                        self._ui(lambda d=dev: self.statusBar().showMessage(
+                            f"⚠️ [{d['name']}] MIoT 部分匹配，缺少项已用硬编码补全", 4000))
+            if needs_save:
                 save_config(_cfg.config)
             # 恢复按钮
             self._ui(lambda: [
                 self._send_btn.setEnabled(True),
                 self._send_btn.setText(" 发送控制指令"),
             ] if hasattr(self, '_send_btn') and self._send_btn else [])
-            self._ui(lambda: self.statusBar().showMessage("✅ MIoT 缓存就绪", 2000))
+            if not partials:
+                self._ui(lambda: self.statusBar().showMessage("✅ MIoT 缓存就绪", 2000))
         import threading
         threading.Thread(target=_fetch, daemon=True).start()
 

@@ -25,27 +25,43 @@ def fetch_miot_spec(model: str) -> dict | None:
         # 1. 索引缓存
         cache_dir = Path.home() / ".ac_controller"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = cache_dir / "miot_instances.json"
+        cache_file = cache_dir / "miot_instances.txt"
         cache_ttl = 7 * 86400  # 7 天
 
         instances = None
         if cache_file.exists():
             age = time.time() - os.path.getmtime(str(cache_file))
             if age < cache_ttl:
-                instances = json.loads(cache_file.read_text(encoding="utf-8"))
+                instances = cache_file.read_text(encoding="utf-8")
 
         if instances is None:
             url = "https://miot-spec.org/miot-spec-v2/instances?status=all"
             req = urllib.request.Request(url, headers={"User-Agent": "AC-Nexus"})
             resp = urllib.request.urlopen(req, timeout=30, context=ctx)
-            instances = json.loads(resp.read()).get("instances", [])
-            cache_file.write_text(json.dumps(instances, ensure_ascii=False), encoding="utf-8")
+            raw = json.loads(resp.read()).get("instances", [])
+            # 清洗为 model|type 行式缓存 + 内存 dict
+            lines = []
+            instances = {}
+            for i in raw:
+                if i.get("model") and i.get("type"):
+                    lines.append(f"{i['model']}|{i['type']}")
+                    instances[i["model"]] = i["type"]
+            cache_file.write_text("\n".join(lines), encoding="utf-8")
+
+        # 解析行式缓存：model|type
+        if isinstance(instances, str):
+            parsed = {}
+            for line in instances.splitlines():
+                line = line.strip()
+                if "|" in line:
+                    m, t = line.split("|", 1)
+                    parsed[m] = t
+            instances = parsed
 
         # 2. 查 model → type urn
-        found = [i for i in instances if i.get("model") == model]
-        if not found:
+        urn = instances.get(model)
+        if not urn:
             return None
-        urn = found[0]["type"]
 
         # 2. 拉 spec JSON
         url = f"https://miot-spec.org/miot-spec-v2/instance?type={urllib.parse.quote(urn)}"
@@ -83,7 +99,13 @@ def fetch_miot_spec(model: str) -> dict | None:
                         result["fan"] = {"siid": siid, "piid": prop["iid"]}
                         break
 
-        return result if len(result) >= 4 else None
+        # 写入日志（部分匹配时提示缺少哪项）
+        all_keys = {"power", "mode", "temp", "fan"}
+        missing = all_keys - set(result.keys())
+        if missing:
+            from acnexus_core.logger import write_log
+            write_log("系统", f"[{model}] MIoT spec 部分匹配，缺少: {', '.join(sorted(missing))}，已用硬编码补全")
+        return result
     except Exception:
         return None
 

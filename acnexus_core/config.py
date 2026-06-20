@@ -400,10 +400,13 @@ def init(api_key=None, qw_host=None, location=None, brand=None):
             needs_save = False
             for did, dev in devs.items():
                 if isinstance(dev, dict) and not dev.get("miot_spec") and dev.get("model"):
-                    spec = fetch_miot_spec(dev["model"])
-                    if spec:
-                        dev["miot_spec"] = spec
-                        needs_save = True
+                    try:
+                        spec = fetch_miot_spec(dev["model"])
+                        if spec:
+                            dev["miot_spec"] = spec
+                            needs_save = True
+                    except Exception:
+                        pass
             if needs_save:
                 save_config(config)
         except Exception:
