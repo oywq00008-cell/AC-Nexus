@@ -234,7 +234,7 @@ def scheduler_loop():
                     _sched_event.clear()
                     break                        # 跳出，外层重新 _do_register
                 idle = sch.idle_seconds()
-                timeout = max(idle, 0) if idle is not None else 30
+                timeout = min(max(idle, 1), 30) if idle is not None else 30  # 最长30秒，防止 macOS 合并定时器
                 if _sched_event.wait(timeout=timeout):
                     _sched_event.clear()
                     break

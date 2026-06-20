@@ -112,7 +112,7 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
         host = dev.get("host", "")
         if not host or not token:
             raise Exception(f"米家设备缺少 host/token: host={host} token={bool(token)}")
-        cmds = build_miot_cmds(power, mode, t, fan, model)
+        cmds = build_miot_cmds(power, mode, t, fan, model, dev.get("miot_spec"))
         send_miot(host, token, cmds)
         now = datetime.now()
         label = {"手动": "手动", "定时": "定时", "自动": "自动调温"}.get(source, source)

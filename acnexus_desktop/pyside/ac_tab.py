@@ -340,6 +340,7 @@ def _control_card(app):
     """)
     btn.setCursor(QtCore.Qt.PointingHandCursor)
     btn.clicked.connect(app._on_send_click)
+    app._send_btn = btn
     cv.addWidget(btn)
 
     cv.addStretch(1)

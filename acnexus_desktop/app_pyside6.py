@@ -473,6 +473,9 @@ class App(QtWidgets.QMainWindow):
         # 首次切到米家且无设备 → 自动弹出添加流程
         if new_brand == "xiaomi_cloud" and not devices:
             QtCore.QTimer.singleShot(300, self._on_add_xiaomi)
+        # 米家设备缺少 miot_spec 时→ 后台补拉，期间冻结发送按钮
+        if new_brand == "xiaomi_cloud" and devices:
+            self._ensure_miot_spec()
 
     def _on_add_xiaomi(self):
         """米家 [+] 按钮：扫码登录 → 拉设备列表 → 勾选添加"""
@@ -488,6 +491,35 @@ class App(QtWidgets.QMainWindow):
             self._refresh_device_ui()
             register_all_jobs()
             self.statusBar().showMessage(f"✅ 已添加 {len(dids)} 个米家设备", 4000)
+
+    def _ensure_miot_spec(self):
+        """当前米家设备缺 miot_spec 时，后台拉取并冻结发送按钮"""
+        mac = _cfg.config.get("current_device_mac", "")
+        provider, dev = _cfg.find_device(mac)
+        if provider != "xiaomi_cloud":
+            return
+        if dev.get("miot_spec") or not dev.get("model"):
+            return
+        # 冻结发送按钮
+        if hasattr(self, '_send_btn') and self._send_btn:
+            self._send_btn.setEnabled(False)
+            self._send_btn.setText("⏳ 获取 MIoT 缓存…")
+        self.statusBar().showMessage("正在获取 MIoT 缓存，请稍后…")
+        def _fetch():
+            from acnexus_core.xiaomi_local import fetch_miot_spec
+            from acnexus_core.config import save_config
+            spec = fetch_miot_spec(dev["model"])
+            if spec:
+                dev["miot_spec"] = spec
+                save_config(_cfg.config)
+            # 恢复按钮
+            self._ui(lambda: [
+                self._send_btn.setEnabled(True),
+                self._send_btn.setText(" 发送控制指令"),
+            ] if hasattr(self, '_send_btn') and self._send_btn else [])
+            self._ui(lambda: self.statusBar().showMessage("✅ MIoT 缓存就绪", 2000))
+        import threading
+        threading.Thread(target=_fetch, daemon=True).start()
 
     def _refresh_brand_ui(self):
         """更新品牌 logo 和 [+] 按钮可见性"""

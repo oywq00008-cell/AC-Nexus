@@ -294,9 +294,10 @@ def open_xiaomi_device_picker(parent, session_dict: dict) -> list[str]:
 
     def on_ok():
         nonlocal result_dids
+        from acnexus_core.xiaomi_local import fetch_miot_spec
         result_dids = [dev["did"] for cb, dev in checkboxes if cb.isChecked()]
         for dev in (d for _, d in checkboxes if d["did"] in result_dids):
-            _cfg.add_or_update_device(dev["did"], {
+            info = {
                 "did": dev["did"],
                 "host": dev["ip"],
                 "mac": dev["mac"],
@@ -304,7 +305,12 @@ def open_xiaomi_device_picker(parent, session_dict: dict) -> list[str]:
                 "name": dev["name"],
                 "brand": "格力",
                 "token": dev.get("token", ""),
-            })
+            }
+            # 自动拉取 MIoT spec 匹配 siid/piid
+            spec = fetch_miot_spec(dev["model"])
+            if spec:
+                info["miot_spec"] = spec
+            _cfg.add_or_update_device(dev["did"], info)
         _cfg.save_config(_cfg.config, sync_device=False)
         dlg.accept()
 

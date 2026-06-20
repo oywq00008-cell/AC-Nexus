@@ -149,7 +149,7 @@ def switch_device(device_id):
 
 DEVICE_KEYS = ("host", "port", "mac", "model", "name", "brand", "fan",
                "schedule_enabled", "auto_adjust", "temp_rules",
-               "token", "did")
+               "token", "did", "miot_spec")
 
 
 def _save_flat_to_device(device_id):
@@ -169,7 +169,7 @@ def _load_device_to_flat(device_id):
     provider = config.get("current_brand_type", "broadlink")
     dev = config.get("devices", {}).get(provider, {}).get(device_id, {})
     DEFAULTS = {
-        "schedule_enabled": True, "auto_adjust": True,
+        "schedule_enabled": False, "auto_adjust": False,
         "temp_rules": [[36,99,24,"cool"],[33,35,25,"cool"],[30,32,26,"cool"],[25,29,27,"cool"],[18,24,0,"off"],[0,17,28,"heat"]],
         "did": "",
     }
@@ -390,6 +390,27 @@ def init(api_key=None, qw_host=None, location=None, brand=None):
     if changed:
         save_config(config)
     apply_config()
+
+    # 后台线程：2 秒后为缺少 miot_spec 的米家设备补拉（避免阻塞启动）
+    def _migrate_miot_spec_bg():
+        import time; time.sleep(2)
+        try:
+            from acnexus_core.xiaomi_local import fetch_miot_spec
+            devs = config.get("devices", {}).get("xiaomi_cloud", {})
+            needs_save = False
+            for did, dev in devs.items():
+                if isinstance(dev, dict) and not dev.get("miot_spec") and dev.get("model"):
+                    spec = fetch_miot_spec(dev["model"])
+                    if spec:
+                        dev["miot_spec"] = spec
+                        needs_save = True
+            if needs_save:
+                save_config(config)
+        except Exception:
+            pass
+    import threading
+    threading.Thread(target=_migrate_miot_spec_bg, daemon=True).start()
+
     from acnexus_core.scheduler import start_scheduler
     start_scheduler()
 
