@@ -77,6 +77,21 @@ class App(QtWidgets.QMainWindow):
         if self._brand_type == "broadlink":
             QtCore.QTimer.singleShot(2000, self._scan_devices)
         QtCore.QTimer.singleShot(500, self._ty_fetch)
+        # macOS: 提前触发局域网权限弹窗，避免首次操作时打断用户
+        if IS_MAC:
+            threading.Thread(target=self._trigger_local_network_permission, daemon=True).start()
+
+    def _trigger_local_network_permission(self):
+        """发送一次无害 UDP 探测，触发 macOS 局域网权限弹窗"""
+        import time; time.sleep(0.5)
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(1)
+            s.sendto(b'', ('255.255.255.255', 9))
+            s.close()
+        except Exception:
+            pass
 
     def _ui(self, fn):
         """线程安全：将 fn 投递到主线程执行"""
