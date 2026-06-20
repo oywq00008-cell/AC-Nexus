@@ -111,3 +111,16 @@ protocols/                    # 自研红外协议
 ## 📜 协议
 
 MIT License
+
+## 💝 致谢
+
+- [python-broadlink](https://github.com/mjg59/python-broadlink) — 博联 RM 驱动
+- [python-miio](https://github.com/rytilahti/python-miio) — 米家 MIoT 局域网协议
+- [hvac_ir](https://github.com/nicko858/hvac_ir) — 红外协议库
+- [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ 协议参考
+- [miot-spec.org](https://miot-spec.org) — 米家设备 siid/piid 规格
+- [OpenStreetMap](https://www.openstreetmap.org) — 城市搜索（Nominatim）
+- [和风天气](https://www.qweather.com) / [百度地图开放平台](https://lbsyun.baidu.com) — 天气数据
+- [中国中央气象台](https://www.nmc.cn) — 西北太平洋台风数据
+- [美国国家飓风中心](https://www.nhc.noaa.gov) — 北大西洋飓风数据
+- [schedule](https://github.com/dbader/schedule) — Python 定时任务库

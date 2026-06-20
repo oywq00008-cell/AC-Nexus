@@ -111,3 +111,16 @@ All config stored locally at `~/.ac_controller/`. Nothing uploaded.
 ## 📜 License
 
 MIT License
+
+## 💝 Acknowledgments
+
+- [python-broadlink](https://github.com/mjg59/python-broadlink) — Broadlink RM driver
+- [python-miio](https://github.com/rytilahti/python-miio) — MIoT local network protocol
+- [hvac_ir](https://github.com/nicko858/hvac_ir) — IR protocol library
+- [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) — C++ protocol reference
+- [miot-spec.org](https://miot-spec.org) — Xiaomi device siid/piid specifications
+- [OpenStreetMap](https://www.openstreetmap.org) — City search (Nominatim)
+- [QWeather](https://www.qweather.com) / [Baidu Maps](https://lbsyun.baidu.com) — Weather data
+- [China NMC](https://www.nmc.cn) — NW Pacific typhoon data
+- [USA NHC](https://www.nhc.noaa.gov) — Atlantic hurricane data
+- [schedule](https://github.com/dbader/schedule) — Python job scheduling

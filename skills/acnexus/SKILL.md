@@ -1,13 +1,13 @@
 ---
 name: AC-Nexus
-version: 5.2.0
+version: 5.2.2
 identifier: oywq00008-cell-AC-Nexus-for-agent-skill
-description: 🎮 AI Agent 智能空调控制核心库 — 零 GUI 依赖，import 即用。支持 17 大品牌空调（格力/美的/海尔/大金等），直连 Broadlink RM 红外遥控器，同时接入所有支持 MIoT 协议的米家红外遥控器。百度+和风双天气源，中央气象台+NHC 双风暴源，多日期组定时模板，Markdown 日志，故障诊断。适配树莓派/NAS/OpenWRT/桌面全平台。（原名 BroadlinkAC，现已更名为 AC-Nexus，正式成为空调中枢）
+description: 🎮 AI Agent 智能空调控制核心库 — 零 GUI 依赖，import 即用。支持 17 大品牌空调（格力/美的/海尔/大金等），直连 Broadlink RM 红外遥控器，同时接入所有支持 MIoT 协议的米家红外遥控器。MIoT spec 自动匹配 siid/piid，百度+和风双天气源，中央气象台+NHC 双风暴源，多日期组定时模板，Markdown 日志，故障诊断。适配树莓派/NAS/OpenWRT/桌面全平台。（原名 BroadlinkAC，现已更名为 AC-Nexus，正式成为空调中枢）
 ---
 
-# AC-Nexus — AI Agent Smart AC Controller v5.2.0
+# AC-Nexus — AI Agent Smart AC Controller v5.2.2
 
-Cross-platform AC control library for Broadlink RM series IR blasters and Xiaomi MIoT-compatible IR remote controllers. **Zero GUI dependency** — designed for AI agents to clone, install, and control air conditioners programmatically. Now includes **IR learning** — teach the system codes from any original remote, no brand limits.
+Cross-platform AC control library for Broadlink RM series IR blasters and Xiaomi MIoT-compatible IR remote controllers. **Zero GUI dependency** — designed for AI agents to clone, install, and control air conditioners programmatically. Device-specific MIoT siid/piid auto-matched from miot-spec.org with 7-day local cache.
 
 > 📢 **Rebrand Notice:** Formerly **BroadlinkAC**, now **AC-Nexus** (空调中枢). All Xiaomi IR remote controllers compatible with MIoT protocol are supported — just scan with Mi Home app to add, then control via local network. No brand limitations.
 
@@ -62,7 +62,9 @@ AC-Nexus supports multiple device providers simultaneously. Devices are organize
         "e870723f41ee": {"host": "192.168.8.214", "model": "RM4 mini", ...}
     },
     "xiaomi_cloud": {
-        "2003509235": {"host": "192.168.8.119", "token": "97af...", "model": "qjiang.acpartner.ac02", ...}
+        "2003509235": {"host": "192.168.8.119", "token": "***", "model": "qjiang.acpartner.ac02",
+                       "miot_spec": {"power": {"siid":3,"piid":1}, "mode": {"siid":3,"piid":2}, ...},
+                       ...}
     }
 }
 ```
@@ -84,10 +86,11 @@ Each provider's devices are fully isolated — separate schedules, temperature r
 | Function | Description |
 |----------|-------------|
 | `init(baidu_key=None, api_key=None, qw_host=None, location=None, brand=None)` | Initialize config + start background scheduler. **Writes to `~/.ac_controller/config.json`**. Idempotent. |
-
-> ⚠️ **Device naming is critical for Agent usability.** Each device's `name` field in config should be a human-readable room/location name (e.g. "二楼卧室", "客厅"). The Agent matches user intent ("关掉二楼房间的空调") by searching device names. Open the desktop app → click the ✏️ rename button next to the device dropdown to set meaningful names.
+| `acnexus_core.xiaomi_local.fetch_miot_spec(model)` | Fetch per-device siid/piid from miot-spec.org. 7-day local cache at `~/.ac_controller/miot_instances.json`. Used automatically when adding devices — not needed by the Agent. |
 | `acnexus_core.config.save_config(cfg)` | Save config to disk (atomic write) |
 | `acnexus_core.config.find_device(mac)` | Find device by MAC across all providers → `(provider, device_dict)` |
+
+> ⚠️ **Device naming is critical for Agent usability.** Each device's `name` field in config should be a human-readable room/location name (e.g. "二楼卧室", "客厅"). The Agent matches user intent ("关掉二楼房间的空调") by searching device names. Open the desktop app → click the ✏️ rename button next to the device dropdown to set meaningful names.
 
 ### AC Control (Broadlink IR + Xiaomi MIoT Local)
 | Function | Description |
@@ -97,7 +100,7 @@ Each provider's devices are fully isolated — separate schedules, temperature r
 | `get_device()` | Get current Broadlink device (for IR learning) |
 | `get_current_device()` | Get current device config dict from `devices[provider][mac]` |
 
-> `send_ac` covers the minimum universal set across all brands. MIoT devices use standard siid=3 (AC service) / siid=4 (fan service) — no per-model mapping needed.
+> `send_ac` covers the minimum universal set across all brands. Xiaomi devices use per-model siid/piid from `dev["miot_spec"]` when available, falling back to hardcoded defaults (siid=3/4). No manual mapping needed.
 
 ### Adding Xiaomi MIoT Devices
 
@@ -114,6 +117,7 @@ session = login_qr()
 ```python
 import acnexus_core.config as _cfg
 from acnexus_core.xiaomi_cloud import list_devices
+from acnexus_core.xiaomi_local import fetch_miot_spec
 
 # List devices on this mi account
 devices = list_devices(session)
@@ -121,6 +125,7 @@ devices = list_devices(session)
 # Pick an IR remote controller and add it
 for d in devices:
     if d["model"] in ("lumi.acpartner.mcn02", "qjiang.acpartner.ac02"):
+        spec = fetch_miot_spec(d["model"])  # Auto-match siid/piid
         _cfg.add_or_update_device(d["did"], {
             "did": d["did"],
             "host": d["ip"],
@@ -129,6 +134,7 @@ for d in devices:
             "name": d["name"],
             "token": d["token"],  # Critical for local network control!
             "brand": "格力",      # Default brand, user changes in Mi Home app
+            "miot_spec": spec,    # Device-specific siid/piid (optional, safe fallback)
         })
         break
 
@@ -157,13 +163,13 @@ print(f"Power={r[0]} Mode={r[1]} Temp={r[2]} Fan={r[3]}")
 
 ### MIoT Protocol Details
 
-All MIoT-compatible IR remote controllers share the same service IDs:
-- **siid=3, piid=1**: Power (True/False)
+MIoT-compatible IR remote controllers use standard service IDs in most cases:
+- **siid=3, piid=1**: Power (True/False) — some devices use piid=5
 - **siid=3, piid=2**: Mode (0=cool 1=heat 2=auto 3=fan 4=dry)
-- **siid=3, piid=4**: Target temperature (16-30)
+- **siid=3, piid=4**: Target temperature (16-30) — some use piid=3
 - **siid=4, piid=2**: Fan speed (0=auto 1=low 2=med 3=high)
 
-> ⚠️ Note: Use `siid=4, piid=2` for fan, not `siid=3, piid=3` — the latter is read-only and does not trigger IR transmission.
+> ⚠️ **Per-device variation:** Not all devices use the same piid values. `fetch_miot_spec(model)` auto-matches the correct values from miot-spec.org. The Agent should prefer reading `dev["miot_spec"]` from config — if present, use those values; if absent, fall back to the hardcoded defaults above.
 
 ### IR Learning (support any brand on Broadlink)
 | Function | Description |
@@ -203,7 +209,7 @@ All MIoT-compatible IR remote controllers share the same service IDs:
 
 **Custom protocols:** Haier, AUX, Panasonic
 
-**Xiaomi MIoT:** All MIoT-compatible IR remote controllers — add via QR scan, control via local network. Supports multiple devices per account.
+**Xiaomi MIoT:** All MIoT-compatible IR remote controllers — add via QR scan, control via local network. Supports multiple devices per account. Per-device siid/piid auto-matched.
 
 **Multi-brand mappings:** Xiaomi, Hualing → Midea protocol; Carrier NQV → Carrier MCA
 
@@ -224,6 +230,7 @@ All MIoT-compatible IR remote controllers share the same service IDs:
 - Thread-safe logging with `threading.Lock`
 - Multi-provider architecture: `devices[provider][mac]` — fully isolated per brand
 - `send_ac` auto-routes: Broadlink → IR hex / Xiaomi → MIoT local network
+- Device-specific MIoT siid/piid auto-matched with 7-day local cache
 
 ## Common Agent Tasks
 
@@ -246,6 +253,7 @@ send_ac("on", "cool", 25, "auto", mac="e870723f41ee")
 ```python
 from acnexus_core.xiaomi_cloud import login_qr
 from acnexus_core.xiaomi_cloud import list_devices
+from acnexus_core.xiaomi_local import fetch_miot_spec
 import acnexus_core.config as _cfg
 
 # Step 1: Login (terminal prints ASCII QR, user scans with Mi Home)
@@ -256,10 +264,11 @@ devices = list_devices(session)
 ir_models = {"lumi.acpartner.mcn02", "qjiang.acpartner.ac02", "chuangmi.remote.v6"}
 for d in devices:
     if d["model"] in ir_models:
+        spec = fetch_miot_spec(d["model"])
         _cfg.add_or_update_device(d["did"], {
             "did": d["did"], "host": d["ip"], "mac": d["mac"],
             "model": d["model"], "name": d["name"], "token": d["token"],
-            "brand": "格力",
+            "brand": "格力", "miot_spec": spec,
         })
 _cfg.save_config(_cfg.config)
 print(f"Added {len(devices)} device(s)")
@@ -272,11 +281,15 @@ from miio import Device
 
 # Get device info from config
 dev = _cfg.config["devices"]["xiaomi_cloud"]["2003509235"]
+# Use device-specific siid/piid from miot_spec when available
+spec = dev.get("miot_spec")
+if spec:
+    props = [spec["power"], spec["mode"], spec["temp"], spec["fan"]]
+else:
+    props = [{"siid":3,"piid":1}, {"siid":3,"piid":2}, {"siid":3,"piid":4}, {"siid":4,"piid":2}]
+
 d = Device(dev["host"], dev["token"])
-r = d.send('get_properties', [
-    {'siid': 3, 'piid': 1}, {'siid': 3, 'piid': 2},
-    {'siid': 3, 'piid': 4}, {'siid': 4, 'piid': 2},
-])
+r = d.send('get_properties', props)
 POWER = {True: "开", False: "关"}
 MODE = {0: "制冷", 1: "制热", 2: "自动", 3: "送风", 4: "除湿"}
 FAN = {0: "自动", 1: "低", 2: "中", 3: "高"}
