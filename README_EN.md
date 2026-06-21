@@ -58,6 +58,7 @@ Agent accepts Chinese or English: `brand="Hitachi"` or `brand="日立"` — auto
 - 🌤️ **Dual weather** — Baidu / QWeather API real-time weather + alerts (completely free)
 - 🌀 **Dual storm** — NMC NW Pacific typhoons + NHC Atlantic hurricanes, path forecast chart, covering all major global storm regions
 - 🎨 **Dark theme** — Light / dark / follow system
+- 🌐 **Bilingual (ZH/EN)** — JSON-based i18n, instant switch without touching functional code
 - 🔧 **Diagnostics** — One-click environment, dependency & device health check
 
 ## 🚀 Quick Start
