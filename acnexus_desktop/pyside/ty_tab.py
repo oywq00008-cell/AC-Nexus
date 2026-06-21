@@ -292,7 +292,7 @@ def _bottom_bar(app):
     grp2.setObjectName("ty_grp2")
     grp2.setStyleSheet("QFrame#ty_grp2 { background:white; border:1px solid #DEDEDE; border-radius:6px; } QFrame#ty_grp2 QWidget { background-color:transparent; }")
     g2l = QtWidgets.QHBoxLayout(grp2); g2l.setContentsMargins(6, 2, 6, 2); g2l.setSpacing(4)
-    g2l.addWidget(QtWidgets.QLabel("风暴<100km自动关闭空调"))
+    g2l.addWidget(QtWidgets.QLabel("风暴靠近智能关闭空调"))
     app._ty_ac_off_sw = toggle()
     app._ty_ac_off_sw.setChecked(_cfg.config.get("typhoon_ac_off", True))
     app._ty_ac_off_sw.clicked.connect(app._on_ac_off_toggle); g2l.addWidget(app._ty_ac_off_sw)

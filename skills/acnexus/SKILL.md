@@ -1,11 +1,11 @@
 ---
 name: AC-Nexus
-version: 5.2.2
+version: 5.3.0
 identifier: oywq00008-cell-AC-Nexus-for-agent-skill
 description: 🎮 AI Agent 智能空调控制核心库 — 零 GUI 依赖，import 即用。支持 17 大品牌空调（格力/美的/海尔/大金等），直连 Broadlink RM 红外遥控器，同时接入所有支持 MIoT 协议的米家红外遥控器。MIoT spec 自动匹配 siid/piid，百度+和风双天气源，中央气象台+NHC 双风暴源，多日期组定时模板，Markdown 日志，故障诊断。适配树莓派/NAS/OpenWRT/桌面全平台。（原名 BroadlinkAC，现已更名为 AC-Nexus，正式成为空调中枢）
 ---
 
-# AC-Nexus — AI Agent Smart AC Controller v5.2.2
+# AC-Nexus — AI Agent Smart AC Controller v5.3.0
 
 Cross-platform AC control library for Broadlink RM series IR blasters and Xiaomi MIoT-compatible IR remote controllers. **Zero GUI dependency** — designed for AI agents to clone, install, and control air conditioners programmatically. Device-specific MIoT siid/piid auto-matched from miot-spec.org with 7-day local cache.
 
@@ -52,7 +52,7 @@ if dist < 100:
     send_ac("off", "cool", 26, "auto")  # Storm protection: auto-shutdown
 ```
 
-## Multi-Brand Architecture (v5.2)
+## Multi-Brand Architecture (v5.3.0)
 
 AC-Nexus supports multiple device providers simultaneously. Devices are organized by brand type in the config:
 
@@ -193,8 +193,8 @@ MIoT-compatible IR remote controllers use standard service IDs in most cases:
 |----------|-------------|
 | `fetch_typhoons()` | Active storms from NMC or NHC |
 | `fetch_typhoon_detail(typhoon_id)` | Detailed track + forecast |
-| `typhoon_threat_distance()` | **Agent-critical**: nearest storm distance (km) + name. <100km = should shutdown. Never throws — returns `(99999, "")` on error |
-| `typhoon.judge_and_shutdown(log_func)` | **One-call**: fetch typhoon data → if <100km, shut down ALL devices across ALL brands + pause scheduler. Returns alerts list |
+| `typhoon_threat_distance()` | **Agent-critical**: nearest storm distance (km) + name. Use `judge_and_shutdown()` for intelligent wind-speed+distance tiered shutdown. Never throws — returns `(99999, "")` on error |
+| `typhoon.judge_and_shutdown(log_func)` | **One-call**: fetch typhoon data → wind-speed + distance tiered shutdown (≥41m/s <100km / ≥33m/s <70km / default <50km), TD excluded, shut down ALL devices across ALL brands + pause scheduler. Returns alerts list |
 
 ### Logger
 | Function | Description |

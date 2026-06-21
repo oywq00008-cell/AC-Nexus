@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 
 NMC_HOST = "https://typhoon.nmc.cn/weatherservice"
 
+_last_ty_log = {}  # {id: {"dist": km, "cat": "台风"}}  用于抑制重复日志
+
 
 def _urlopen(url, timeout=8):
     """兼容 Windows：绕过自签名证书验证"""
@@ -32,8 +34,12 @@ def fetch_typhoons():
             return []
         data = json.loads(body.group(1))
         active = []
+        seen = set()
         for t in data.get("typhoonList", []):
             if t[7] == "start":
+                is_nameless = t[1] == "nameless" or t[2] == "nameless"
+                if not is_nameless and t[0] in seen: continue
+                if not is_nameless: seen.add(t[0])
                 cn = t[2]
                 eng = t[1]
                 if cn == "nameless":
@@ -199,7 +205,10 @@ def fetch_nhc_storms():
         return []
 
     results = []
+    seen = set()
     for s in data.get("activeStorms", []):
+        if s["id"] in seen: continue
+        seen.add(s["id"])
         try:
             kt = int(s["intensity"])
             wind_ms = round(kt * 0.514)
@@ -263,7 +272,7 @@ def get_cached():
     return _ty_cache
 
 
-def judge_and_shutdown(write_log_func, ty_alert_muted=False):
+def judge_and_shutdown(write_log_func):
     alerts = []
     min_dist = 99999
     import acnexus_core.config as _cfg
@@ -274,19 +283,50 @@ def judge_and_shutdown(write_log_func, ty_alert_muted=False):
     loc_lat = _cfg.LOCATION["lat"]
     loc_lon = _cfg.LOCATION["lon"]
 
+    global _last_ty_log
     for t in _ty_cache:
         detail = t.get("detail")
         if not detail:
             continue
         dist = calc_distance(loc_lat, loc_lon, detail["lat"], detail["lon"])
         status = "⚠️ 预警" if dist < alert_km else "✅ 安全"
-        write_log_func("台风", f"{detail['cn']} ({detail['eng']}) {detail['cat']} 距{dist}km {status}")
+        tid = t.get("id", "")
+        last = _last_ty_log.get(tid)
+        cat = detail.get("cat", "")
+        if last and abs(dist - last["dist"]) <= 50 and cat == last.get("cat"):
+            pass  # 距离未变化超 50km 且等级未变 → 跳过日志
+        else:
+            _last_ty_log[tid] = {"dist": dist, "cat": cat}
+            write_log_func("台风", f"{detail['cn']} ({detail['eng']}) {cat} 距{dist}km {status}")
         if dist < min_dist:
             min_dist = dist
-        if dist < alert_km and alert_enabled and not ty_alert_muted:
+        if dist < alert_km and alert_enabled:
             alerts.append((detail, dist))
 
-    if ac_off_enabled and min_dist < 100:
+    # 风速+距离三级关机判断：风力越强，关机半径越大
+    should_off = False
+    off_reason = ""
+    for t in _ty_cache:
+        detail = t.get("detail")
+        if not detail: continue
+        if detail.get("cat") == "热带低压":  # TD 不足以造成威胁，排除
+            continue
+        wind = float(detail.get("wind", 0))
+        dist = calc_distance(loc_lat, loc_lon, detail["lat"], detail["lon"])
+        if wind >= 41 and dist < 100:
+            should_off = True
+            off_reason = f"风速{wind:.0f}m/s 距{dist}km（强台风→100km）"
+            break
+        elif wind >= 33 and dist < 70:
+            should_off = True
+            off_reason = f"风速{wind:.0f}m/s 距{dist}km（台风→70km）"
+            break
+        elif dist < 50:
+            should_off = True
+            off_reason = f"风速{wind:.0f}m/s 距{dist}km（50km默认）"
+            break
+
+    if ac_off_enabled and should_off:
         from acnexus_core.ac_control import send_ac
         from acnexus_core.scheduler import pause_scheduler
         pause_scheduler()
@@ -307,7 +347,7 @@ def judge_and_shutdown(write_log_func, ty_alert_muted=False):
                     continue
                 try:
                     send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
-                    write_log_func("空调", f"[{datetime.now():%H:%M}] 台风靠近（距{min_dist}km）→ [{name}] 已自动关机")
+                    write_log_func("空调", f"[{datetime.now():%H:%M}] {off_reason} → [{name}] 已自动关机")
                     off_count += 1
                 except Exception as e:
                     write_log_func("系统", f"台风关机失败 [{name}]: {e}")

@@ -17,6 +17,7 @@ a = Analysis(
         ('logos', 'logos'),
         ('fonts', 'fonts'),
         ('icons', 'icons'),
+        ('langs', 'langs'),
         ('使用文档.md', '.'),
         ('acnexus.png', '.'),
         ('acnexus.ico', '.'),

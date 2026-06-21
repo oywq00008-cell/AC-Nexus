@@ -15,6 +15,20 @@ from ._utils import lbl
 from .theme import apply_theme, _is_system_dark  # noqa: F401
 
 
+def _try_apply_lang(widget):
+    """延迟应用语言包（由 _dialog_content 的 QTimer 触发）。
+    若对话框已通过其他路径完成翻译则跳过，避免重复应用打乱 combo 索引。"""
+    if getattr(widget, '_lang_applied', False):
+        return
+    try:
+        from acnexus_desktop import i18n
+        if i18n._CURRENT_LANG != "zh":
+            i18n.apply_lang(widget)
+            widget._lang_applied = True
+    except ImportError:
+        pass
+
+
 def _make_dialog(parent, title, w, h, frameless=False):
     """创建对话框：Windows 无边框自绘，其他原生。frameless=True 用原生窗口"""
     if frameless or sys.platform != "win32":
@@ -71,6 +85,9 @@ def _dialog_content(dlg, title="", title_size=13, frameless=False, scroll=True, 
             sw = QtWidgets.QWidget(); swl = QtWidgets.QVBoxLayout(sw); layout.addWidget(sw)
         else:
             swl = QtWidgets.QVBoxLayout(); layout.addLayout(swl)
+
+    # 延迟 0ms 应用语言包（此时调用方已添加完所有控件，exec 尚未阻塞事件循环）
+    QtCore.QTimer.singleShot(0, lambda d=dlg: _try_apply_lang(d))
     return layout, swl
 
 
@@ -87,7 +104,7 @@ def open_about(parent):
     layout, swl = _dialog_content(dlg, frameless=True)
 
     layout.addStretch()
-    layout.addWidget(lbl("AC-Nexus v5.2", bold=True, size=18), alignment=QtCore.Qt.AlignCenter)
+    layout.addWidget(lbl("AC-Nexus v5.3.0", bold=True, size=18), alignment=QtCore.Qt.AlignCenter)
     layout.addSpacing(10)
     layout.addWidget(lbl("智能空调控制系统", size=13), alignment=QtCore.Qt.AlignCenter)
     layout.addWidget(lbl("Broadlink RM + 米家 MIoT 红外遥控器", color="#666", size=11), alignment=QtCore.Qt.AlignCenter)

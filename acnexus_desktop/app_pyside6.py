@@ -38,7 +38,7 @@ class App(QtWidgets.QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(APP_NAME + "  v5.2")
+        self.setWindowTitle(APP_NAME + "  v5.3.0")
         self.resize(865, 780)
         self.setMinimumSize(760, 650)
 
@@ -73,6 +73,14 @@ class App(QtWidgets.QMainWindow):
         self._refresh_device_list()
         update_brand_logo(self)
         self._update_schedule_display()
+
+        # ── 语言包加载 ──
+        cur_lang = _cfg.config.get("lang", "zh")
+        if cur_lang != "zh":
+            from .i18n import load_lang, apply_lang
+            load_lang(cur_lang)
+            apply_lang(self)
+
         threading.Thread(target=self._init_data, daemon=True).start()
         if self._brand_type == "broadlink":
             QtCore.QTimer.singleShot(2000, self._scan_devices)
@@ -247,6 +255,15 @@ class App(QtWidgets.QMainWindow):
         else: self._quit_from_tray()
 
     # ===== 数据拉取 + 渲染 =====
+    def _reapply_lang(self):
+        """每次重新渲染后调用，将英文翻译重新应用到新建的控件上"""
+        if _cfg.config.get("lang", "zh") != "zh":
+            try:
+                from .i18n import apply_lang
+                apply_lang(self)
+            except ImportError:
+                pass
+
     def _init_data(self):
         self._fetch_all()
         self._ui(self._render_all)
@@ -269,6 +286,7 @@ class App(QtWidgets.QMainWindow):
         except Exception as e: print(f"[渲染预警] {e}")
         try: self._update_alert_source()
         except Exception as e: print(f"[更新预警源] {e}")
+        self._reapply_lang()
 
     def _fetch_weather_all(self):
         threading.Thread(target=self._do_fetch_weather_all, daemon=True).start()
@@ -285,6 +303,7 @@ class App(QtWidgets.QMainWindow):
         self._ui(lambda: render_weather(self))
         self._ui(lambda: render_alerts(self))
         self._ui(self._update_alert_source)
+        self._ui(self._reapply_lang)
         self._ui(self._schedule_refresh)
 
     def _ty_fetch(self):
@@ -301,24 +320,17 @@ class App(QtWidgets.QMainWindow):
     def _ty_cycle_render(self):
         try:
             render_typhoon(self)
-            alerts = judge_and_shutdown(
-                write_log, self._ty_alert_muted)
-            for detail, dist in alerts: self._show_ty_alert(detail, dist)
-            # 所有台风离开预警范围后自动解除静音，确保新台风出现时能再次弹窗
-            if self._ty_alert_muted:
-                from acnexus_core.typhoon import calc_distance
-                alert_km = _cfg.config.get("typhoon_alert_km", 800)
-                any_in_range = False
-                for t in self._ty_data:
-                    d = t.get("detail")
-                    if d:
-                        dist = calc_distance(_cfg.LOCATION["lat"], _cfg.LOCATION["lon"],
-                                            d["lat"], d["lon"])
-                        if dist < alert_km:
-                            any_in_range = True
-                            break
-                if not any_in_range:
-                    self._ty_alert_muted = False
+            self._reapply_lang()
+            alerts = judge_and_shutdown(write_log)
+            if not self._ty_alert_muted:
+                for detail, dist in alerts:
+                    if self._ty_alert_muted:  # 前一个弹窗已静音 → 跳过剩余
+                        break
+                    self._show_ty_alert(detail, dist)
+            elif self._ty_alert_muted and not alerts:
+                # 所有台风已离开预警范围 → 解除静音
+                self._ty_alert_muted = False
+                write_log("台风", "预警已解除，静音已重置")
         except Exception as e:
             write_log("系统", f"[台风周期] 异常: {e}")
         finally:
@@ -484,6 +496,7 @@ class App(QtWidgets.QMainWindow):
         self._refresh_device_list()
         self._refresh_device_ui()
         self._refresh_brand_ui()
+        self._reapply_lang()
         # 定时任务由保存/增删/开关触发，切品牌不需要重注册（现在遍历所有 provider）
         # 首次切到米家且无设备 → 自动弹出添加流程
         if new_brand == "xiaomi_cloud" and not devices:
@@ -628,6 +641,7 @@ class App(QtWidgets.QMainWindow):
         self._tab_widget.setCurrentIndex(idx)
         for i, btn in enumerate(self._tab_btns):
             btn.setChecked(i == idx)
+        self._reapply_lang()
 
     def _build_status_bar(self):
         """底部状态栏：● 运行正常 | 版本号"""
@@ -639,7 +653,7 @@ class App(QtWidgets.QMainWindow):
         status_label.setProperty("status_label_kind", "ok")
         self._status_label = status_label
         sb.addWidget(status_label)
-        self._version_label = QtWidgets.QLabel("当前版本：v5.2")
+        self._version_label = QtWidgets.QLabel("当前版本：v5.3.0")
         self._version_label.setStyleSheet("color:#999;")
         self._version_label.setProperty("status_label_kind", "version")
         sb.addPermanentWidget(self._version_label)
@@ -761,6 +775,7 @@ class App(QtWidgets.QMainWindow):
         self._adjust_sw.setChecked(dev.get("auto_adjust",True))
         self._update_schedule_display()
         self._refresh_rules_display()
+        self._reapply_lang()
         if hasattr(self, '_refresh_tmpl_cb'):
             self._refresh_tmpl_cb()
 
@@ -859,8 +874,10 @@ class App(QtWidgets.QMainWindow):
             self._ty_source_label.setText("数据: 中国中央气象台 (NMC)")
             self._ty_provider_cb.setCurrentText("西北太平洋台风")
     def _on_ty_provider_change(self, txt):
-        _cfg.config["typhoon_provider"]="nhc" if "飓风" in txt else "nmc"
-        save_config(_cfg.config,sync_device=False); self._update_ty_source_label(); self._ty_fetch()
+        _cfg.config["typhoon_provider"]="nhc" if ("飓风" in txt or "NHC" in txt or "Hurricane" in txt) else "nmc"
+        save_config(_cfg.config,sync_device=False); self._update_ty_source_label()
+        self._reapply_lang()
+        self._ty_fetch()
     def _ty_prev_page(self):
         if self._ty_page>0: self._ty_page-=1; _do_render_typhoon(self)
     def _ty_next_page(self): self._ty_page+=1; _do_render_typhoon(self)
@@ -868,10 +885,78 @@ class App(QtWidgets.QMainWindow):
         if self._alert_page>0: self._alert_page-=1; _do_render_alerts(self)
     def _alert_next_page(self): self._alert_page+=1; _do_render_alerts(self)
     def _show_ty_alert(self, detail, dist):
-        QtWidgets.QMessageBox.warning(self,"⚠️ 台风预警",
-            f"{detail}\n\n距离约 {dist}km\n\n请密切关注风暴动态！")
-        self._ty_alert_muted = True
-        write_log("台风", "预警已静音")
+        """台风预警弹窗：可勾选静音 + 10 秒倒计时自动关闭"""
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("⚠️ 台风预警")
+        dlg.setMinimumWidth(420)
+        flags = dlg.windowFlags()
+        dlg.setWindowFlags(flags & ~QtCore.Qt.WindowContextHelpButtonHint)
+
+        layout = QtWidgets.QVBoxLayout(dlg)
+        layout.setContentsMargins(20, 16, 20, 12)
+        layout.setSpacing(12)
+
+        cn = detail.get("cn", "未知")
+        eng = detail.get("eng", "")
+        cat = detail.get("cat", "")
+        wind = detail.get("wind", "?")
+        info = f"{cn} ({eng})  [{cat}]  风速{wind}m/s\n\n距离约 {dist}km\n\n请密切关注风暴动态！"
+        msg = QtWidgets.QLabel(info)
+        msg.setWordWrap(True)
+        layout.addWidget(msg)
+
+        # 底部：勾选框 + 倒计时
+        bottom = QtWidgets.QHBoxLayout()
+        bottom.setSpacing(8)
+        cb = QtWidgets.QCheckBox("本次启动不再弹出")
+        bottom.addWidget(cb)
+        bottom.addStretch()
+        countdown_lbl = QtWidgets.QLabel("10 秒后自动关闭")
+        bottom.addWidget(countdown_lbl)
+        layout.addLayout(bottom)
+
+        # 确定按钮
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addStretch()
+        ok_btn = QtWidgets.QPushButton("确定")
+        ok_btn.setMinimumWidth(80)
+        btn_row.addWidget(ok_btn)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        dlg.adjustSize()
+
+        # 倒计时逻辑（闭包内可变变量）
+        secs = [10]
+        auto = [False]
+
+        def _tick():
+            secs[0] -= 1
+            if secs[0] > 0:
+                countdown_lbl.setText(f"{secs[0]} 秒后自动关闭")
+            else:
+                countdown_lbl.setText("已自动关闭")
+                auto[0] = True
+                cb.setChecked(True)
+                dlg.accept()
+
+        timer = QtCore.QTimer(dlg)
+        timer.timeout.connect(_tick)
+        timer.start(1000)
+
+        def _on_done():
+            timer.stop()
+            if auto[0]:
+                self._ty_alert_muted = True
+                write_log("台风", "预警已静音（10秒无人操作）")
+            elif cb.isChecked():
+                self._ty_alert_muted = True
+                write_log("台风", "预警已静音")
+
+        ok_btn.clicked.connect(dlg.accept)
+        dlg.finished.connect(_on_done)
+
+        dlg.exec()
     def _edit_ty_alert(self): edit_ty_alert(self)
     def _update_ty_status(self):
         km=_cfg.config.get("typhoon_alert_km",800)
@@ -884,12 +969,10 @@ class App(QtWidgets.QMainWindow):
             write_log("台风", "风暴自动关空调: 已开启")
         else:
             if QtWidgets.QMessageBox.question(self,"⚠️ 安全警示",
-                "当风暴<100km时，说明你可能正处于风暴的核心影响圈，\n"
-                "此时大风可能会让空调外机倒转导致烧毁，\n"
-                "雷暴有可能击毁正在运行的空调硬件。\n\n"
-                "When the storm is within 100km, you may be in its core impact zone.\n"
-                "Strong winds can cause the outdoor unit to reverse and burn out,\n"
-                "and thunderstorms may damage running AC hardware.\n\n"
+                "当前模式会智能判断您是否处于风暴影响中，\n"
+                "如果关闭此功能，您的空调可能因为风暴影响而损坏，\n\n"
+                "The current mode intelligently determines if you are under storm impact.\n"
+                "If you disable this feature, your AC may be damaged due to storm impact.\n\n"
                 "确定关闭吗？ / Confirm to disable?"
             )!=QtWidgets.QMessageBox.Yes:
                 self._ty_ac_off_sw.setChecked(True); return

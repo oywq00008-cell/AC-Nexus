@@ -5,6 +5,14 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from ._utils import lbl, is_dark
 
 
+def _try_apply(widget):
+    try:
+        from acnexus_desktop.i18n import apply_lang
+        apply_lang(widget)
+    except ImportError:
+        pass
+
+
 def _make_draggable(title_bar, dlg):
     """让标题栏可拖拽移动窗口"""
     def press(e):
@@ -163,5 +171,9 @@ def open_xiaomi_login_dialog(parent):
             signals.login_err.emit(str(e))
 
     threading.Thread(target=do_login, daemon=True).start()
+
+    # 延迟翻译：等异步线程更新状态文字后再翻译
+    QtCore.QTimer.singleShot(100, lambda d=dlg: _try_apply(d))
+
     dlg.exec()
     return result["session"]

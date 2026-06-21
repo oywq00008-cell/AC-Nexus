@@ -421,7 +421,7 @@ def _schedule_card(app, grid):
         provider = _cfg.config.get("current_brand_type", "broadlink")
         dev = _cfg.config.setdefault("devices", {}).setdefault(provider, {}).setdefault(mac, {})
         name = dev.get("name", mac[:8] if mac else "未知")
-        if t == "< 关闭定时 >":
+        if t in ("< 关闭定时 >", "< Timer OFF >"):
             dev.pop("active_template", None)
             dev["schedule_enabled"] = False
             _cfg.config["schedule_enabled"] = False

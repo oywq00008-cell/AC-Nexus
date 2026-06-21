@@ -16,6 +16,7 @@ a = Analysis(
         ('logos', 'logos'),
         ('fonts/HarmonyOS_Sans_SC_Regular.ttf', 'fonts'),
         ('icons', 'icons'),
+        ('langs', 'langs'),
         ('使用文档.md', '.'),
         ('acnexus.png', '.'),
         ('acnexus.icns', '.'),
@@ -90,6 +91,6 @@ app = BUNDLE(
         'LSMinimumSystemVersion': '10.13',
         'CFBundleDisplayName': 'AC-Nexus',
         'CFBundleName': 'AC-Nexus',
-        'CFBundleShortVersionString': '5.2.0',
+        'CFBundleShortVersionString': '5.3.0',
     },
 )

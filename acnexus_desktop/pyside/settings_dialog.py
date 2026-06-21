@@ -249,6 +249,34 @@ def open_settings(app):
     theme_cb.setEditable(True); theme_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter); theme_cb.lineEdit().setReadOnly(True)
     rl.addWidget(theme_cb, alignment=QtCore.Qt.AlignRight); c1l.addWidget(r)
     mode_map = {"system": "跟随系统", "light": "浅色", "dark": "深色"}
+
+    # ── 语言 ──
+    r = QtWidgets.QWidget(); rl = QtWidgets.QHBoxLayout(r); rl.setContentsMargins(0, 0, 0, 0)
+    rl.addWidget(QtWidgets.QLabel("语言:")); rl.addStretch(1)
+    lang_cb = QtWidgets.QComboBox()
+    lang_cb.setMinimumWidth(140); lang_cb.setMaximumWidth(140)
+    lang_cb.setEditable(True)
+    lang_cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter)
+    lang_cb.lineEdit().setReadOnly(True)
+    with QtCore.QSignalBlocker(lang_cb):
+        lang_cb.addItems(["中文", "English"])
+    cur_lang = _cfg.config.get("lang", "zh")
+    with QtCore.QSignalBlocker(lang_cb):
+        lang_cb.setCurrentText("English" if cur_lang == "en" else "中文")
+    rl.addWidget(lang_cb, alignment=QtCore.Qt.AlignRight); c1l.addWidget(r)
+    def on_lang_change(txt):
+        lang_code = "en" if txt == "English" else "zh"
+        if lang_code == _cfg.config.get("lang", "zh"):
+            return
+        from acnexus_desktop.i18n import load_lang, apply_lang
+        load_lang(lang_code)
+        apply_lang(dlg)
+        _cfg.config["lang"] = lang_code
+        save_config(_cfg.config, sync_device=False)
+        parent_w = dlg.parentWidget()
+        if parent_w:
+            apply_lang(parent_w)
+    lang_cb.currentTextChanged.connect(on_lang_change)
     cur_mode = _cfg.config.get("appearance_mode", "system")
     with QtCore.QSignalBlocker(theme_cb):
         theme_cb.addItems(["跟随系统", "浅色", "深色"])
@@ -298,7 +326,7 @@ def open_settings(app):
         for combo in dlg.findChildren(QtWidgets.QComboBox):
             combo.setStyleSheet(f"QComboBox {{ background:{'#3D3D3D' if dark else '#FAFAFA'}; color:{'#EEE' if dark else '#333'}; border:1px solid {'#555' if dark else '#DEDEDE'}; border-radius:6px; padding:2px 6px; selection-background-color:#2F80ED; selection-color:white; }} QComboBox:hover {{ border-color:{'#777' if dark else '#BBB'}; }}")
     def on_theme_change(t):
-        mode = {v: k for k, v in mode_map.items()}.get(t, "system")
+        mode = ["system", "light", "dark"][theme_cb.currentIndex()] if theme_cb.currentIndex() < 3 else "system"
         apply_theme(mode)
         d = mode == "dark" or (mode == "system" and _is_system_dark())
         _refresh_settings_theme(d)
@@ -611,17 +639,17 @@ def open_settings(app):
     qw_host.setStyleSheet(_le_qss)
     qwl.addWidget(lbl("免费订阅需填入个人 Host 地址", color="gray"), alignment=QtCore.Qt.AlignCenter); c3l.addWidget(qw_frame)
 
-    if "和风" in provider_cb.currentText(): bd_frame.hide()
+    if "和风" in provider_cb.currentText() or "QWeather" in provider_cb.currentText(): bd_frame.hide()
     else: qw_frame.hide()
     def on_provider_change(txt):
-        if "和风" in txt: bd_frame.hide(); qw_frame.show()
+        if "和风" in txt or "QWeather" in txt: bd_frame.hide(); qw_frame.show()
         else: qw_frame.hide(); bd_frame.show()
     provider_cb.currentTextChanged.connect(on_provider_change)
     swl.addWidget(card3)
 
     # ── 保存 ──
     def save():
-        _cfg.config["weather_provider"] = "qweather" if "和风" in provider_cb.currentText() else "baidu"
+        _cfg.config["weather_provider"] = "qweather" if ("和风" in provider_cb.currentText() or "QWeather" in provider_cb.currentText()) else "baidu"
         _cfg.config["baidu_key"] = bd_entry.text().strip()
         _cfg.config["api_key"] = qw_key.text().strip()
         _cfg.config["qw_host"] = qw_host.text().strip()
@@ -631,7 +659,7 @@ def open_settings(app):
         if raw_brand.startswith("🛠 "):
             raw_brand = raw_brand[2:]  # "🛠 " = 2 chars
         _cfg.config["brand"] = raw_brand
-        _cfg.config["appearance_mode"] = {v: k for k, v in mode_map.items()}.get(theme_cb.currentText(), "system")
+        _cfg.config["appearance_mode"] = ["system", "light", "dark"][theme_cb.currentIndex()] if theme_cb.currentIndex() < 3 else "system"
         if hasattr(dl, "_picked_loc"):
             _cfg.config["location"] = dl._picked_loc
         save_config(_cfg.config); apply_config()
@@ -683,5 +711,21 @@ def open_settings(app):
         for w in dlg.findChildren(QtWidgets.QPushButton):
             if not w.styleSheet():
                 w.setStyleSheet(btn_qss)
+
+    # 非中文模式下自动翻译
+    if _cfg.config.get("lang", "zh") != "zh":
+        try:
+            from acnexus_desktop.i18n import load_lang, apply_lang
+            load_lang(_cfg.config["lang"])
+            with QtCore.QSignalBlocker(theme_cb), QtCore.QSignalBlocker(lang_cb):
+                apply_lang(dlg)
+            # 显式保证 combo 索引正确（防 Qt 平台差异导致 setItemText 侧漏重置）
+            with QtCore.QSignalBlocker(theme_cb):
+                theme_cb.setCurrentIndex({"system":0,"light":1,"dark":2}.get(
+                    _cfg.config.get("appearance_mode","system"), 0))
+            with QtCore.QSignalBlocker(lang_cb):
+                lang_cb.setCurrentText("English" if _cfg.config.get("lang","zh")=="en" else "中文")
+        except ImportError:
+            pass
 
     import threading; dlg.exec()

@@ -1,8 +1,8 @@
-# 🌀 AC-Nexus v5.2
+# 🌀 AC-Nexus v5.3.0
 
 [中文](README.md) | English
 
-**The world's first AC controller with built-in storm safety protection.** When a typhoon or hurricane approaches within 100km, AC-Nexus automatically shuts down all air conditioners to prevent outdoor unit damage from high winds — a feature no other smart home platform offers.
+**The world's first AC controller with intelligent storm safety protection.** Real-time wind speed + distance analysis intelligently determines whether to shut down ACs to protect outdoor units — stronger storms trigger protection at greater distances, while tropical depressions are automatically excluded to prevent false shutdowns. A feature no other smart home platform offers.
 
 Broadlink + Xiaomi MIoT dual-ecosystem support, Xiaomi's massive code library + built-in **17 common AC brand IR protocols**, plus **IR learning** for any unsupported brand. AI Agents control AC with one line of Python via `import acnexus_core`. Desktop app runs on all platforms — download and go, with a complete user guide that ensures even beginners can get started quickly.
 
@@ -28,10 +28,9 @@ send_ac("on", "cool", 26, "auto")                     # control AC
 send_ac("off", "cool", 26, "auto", mac="e870723f")    # specific device
 
 # Storm threat assessment — unique feature
-from acnexus_core import typhoon_threat_distance
+from acnexus_core import typhoon_threat_distance, typhoon
 dist, name = typhoon_threat_distance()
-if dist < 100:
-    send_ac("off", "cool", 26, "auto", source="typhoon")  # auto shutdown
+alerts = typhoon.judge_and_shutdown(print)  # Wind-speed + distance tiered shutdown, one call
 ```
 
 No GUI needed — `pip install -r requirements-core.txt` is enough.
@@ -51,7 +50,7 @@ Agent accepts Chinese or English: `brand="Hitachi"` or `brand="日立"` — auto
 
 ## ✨ Features
 
-- 🌪️ **Storm protection** — Auto-shutdown all ACs when storm < 100km away, protecting outdoor units
+- 🌪️ **Storm protection** — Intelligent wind-speed + distance tiered logic (Cat 3+ <100km / Cat 1-2 <70km / default <50km), tropical depressions excluded, auto-shutdown + pause scheduler
 - 📡 **Dual ecosystem** — Broadlink RM LAN discovery + Xiaomi MIoT cloud login with QR code
 - 🎓 **IR learning** — Teach the system codes from your original remote for any brand
 - ⏰ **Schedule templates** — Multi-group timers with flexible date and time slot configuration
