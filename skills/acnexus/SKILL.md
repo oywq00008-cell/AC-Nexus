@@ -45,11 +45,12 @@ send_ac("off", "cool", 26, "auto")    # Turn off
 # Weather — dual source (Baidu default, falls back to QWeather)
 weather = fetch_weather()
 
-# Storm threat
-from acnexus_core import typhoon_threat_distance
+# Storm threat — quick check + smart shutdown
+from acnexus_core import typhoon_threat_distance, typhoon
 dist, name = typhoon_threat_distance()
-if dist < 100:
-    send_ac("off", "cool", 26, "auto")  # Storm protection: auto-shutdown
+print(f"Nearest: {name} at {dist}km")
+# Intelligent: wind-speed + distance tiered, TD excluded, pauses scheduler
+alerts = typhoon.judge_and_shutdown(print)
 ```
 
 ## Multi-Brand Architecture (v5.3.0)
@@ -300,9 +301,9 @@ print(f"{dev['name']}: {POWER[r[0]['value']]} {MODE[r[1]['value']]} {r[2]['value
 ```python
 from acnexus_core import init, typhoon
 init()
-# ✅ One-liner: shutdown all devices on all brands if storm < 100km,
-#    also pauses scheduler to prevent auto-adjust/timed-on from
-#    re-opening the AC. Returns list of alert dicts.
+# ✅ One-liner: intelligent wind-speed + distance tiered shutdown
+#    (≥41m/s<100km / ≥33m/s<70km / <50km default),
+#    tropical depressions excluded, also pauses scheduler
 alerts = typhoon.judge_and_shutdown(print)
 if not alerts:
     print("No storm threat — all clear")
@@ -330,7 +331,7 @@ send_ac("off", "cool", 26, "auto")  # Routes to learned code automatically
 
 > ⚠️ **All schedule changes are persistent** — they survive Python process exit and will be executed by the background scheduler daemon. Always confirm with the user before enabling or modifying schedules.
 
-The scheduler runs all devices across all providers. Typhoon auto-shutdown (<100km) pauses the scheduler for all devices.
+The scheduler runs all devices across all providers. Typhoon auto-shutdown (intelligent wind-speed + distance tiered) pauses the scheduler for all devices.
 
 ### Read current schedule
 ```python
