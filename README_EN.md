@@ -41,7 +41,7 @@ No GUI needed — `pip install -r requirements-core.txt` is enough.
 
 | Gree | Midea | Haier | AUX | Hisense | Daikin | Mitsubishi | Panasonic | Hitachi |
 |------|-------|-------|-----|---------|--------|------------|-----------|---------|
-| Fujitsu | Ballu | Carrier | Hyundai | Fuego | — | — | — | — |
+| Fujitsu | Ballu | Carrier | Hyundai | Fuego | Wahin | Xiaomi | — | — |
 
 **All MIoT-compatible IR devices can be added to the system**, leveraging Xiaomi's massive code library, with full support in both Agent mode and the desktop app.
 
