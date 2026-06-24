@@ -524,7 +524,7 @@ class App(QtWidgets.QMainWindow):
         """遍历所有米家设备，为缺少 miot_spec 的后台补拉并冻结发送按钮"""
         devs = _cfg.config.get("devices", {}).get("xiaomi_cloud", {})
         missing = [(did, dev) for did, dev in devs.items()
-                   if isinstance(dev, dict) and not dev.get("miot_spec") and dev.get("model")]
+                   if isinstance(dev, dict) and dev.get("model") and len(dev.get("miot_spec") or {}) < 4]
         if not missing:
             return
         # 冻结发送按钮

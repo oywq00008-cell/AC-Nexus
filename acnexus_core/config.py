@@ -404,7 +404,7 @@ def init(api_key=None, qw_host=None, location=None, brand=None):
             devs = config.get("devices", {}).get("xiaomi_cloud", {})
             needs_save = False
             for did, dev in devs.items():
-                if isinstance(dev, dict) and not dev.get("miot_spec") and dev.get("model"):
+                if isinstance(dev, dict) and dev.get("model") and len(dev.get("miot_spec") or {}) < 4:
                     try:
                         spec = fetch_miot_spec(dev["model"])
                         if spec:
