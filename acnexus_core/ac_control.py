@@ -56,10 +56,12 @@ def discover_devices(timeout=5):
 
 def get_device(mac=None):
     """获取博联设备：优先从 config 读 host 直连，失败扫描"""
-    provider = _cfg.config.get("current_brand_type", "broadlink")
-    devs = _cfg.config.get("devices", {}).get(provider, {})
-    if not mac:
+    if mac:
+        provider, _ = _cfg.find_device(mac)
+    else:
+        provider = _cfg.config.get("current_brand_type", "broadlink")
         mac = _cfg.config.get("current_device_mac", "")
+    devs = _cfg.config.get("devices", {}).get(provider, {})
     dev = devs.get(mac, {})
     host = dev.get("host", "")
     
@@ -85,7 +87,7 @@ def get_device(mac=None):
         "host": d.host[0] if isinstance(d.host, tuple) else str(d.host),
         "port": d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80,
         "mac": new_mac, "model": d.model, "name": d.model or d.name,
-    })
+    }, provider="broadlink")
     _cfg.save_config(_cfg.config)
     return d
 

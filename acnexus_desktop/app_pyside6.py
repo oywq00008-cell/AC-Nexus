@@ -795,9 +795,9 @@ class App(QtWidgets.QMainWindow):
         self._conn_status.setText("● 扫描中")
         self._conn_status.setStyleSheet(
             "QLabel { color:#E67E22; font-weight:medium; border:1px solid #E67E22; border-radius:8px; padding:0px 8px; font-size:13px; max-height:17px; }")
-        threading.Thread(target=self._do_scan_devices, daemon=True).start()
+        threading.Thread(target=self._do_scan_devices, args=(self._brand_type,), daemon=True).start()
 
-    def _do_scan_devices(self):
+    def _do_scan_devices(self, brand_type="broadlink"):
         try:
             devices = discover_devices(timeout=5)
         except Exception as e:
@@ -824,7 +824,7 @@ class App(QtWidgets.QMainWindow):
                 "host": d.host[0] if isinstance(d.host, tuple) else str(d.host),
                 "port": d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80,
                 "mac": mac, "model": d.model, "name": d.model or d.name,
-            })
+            }, provider=brand_type)
         # sync_device=False 避免 config 根级脏扁平键覆写新建设备的正确属性
         save_config(_cfg.config, sync_device=False)
         _cfg._online_macs = online

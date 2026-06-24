@@ -181,9 +181,10 @@ def _load_device_to_flat(device_id):
         config[k] = dev.get(k, DEFAULTS.get(k)) if k in DEFAULTS else dev.get(k, "")
 
 
-def add_or_update_device(device_id, info):
-    """添加或更新设备信息，不覆盖已有配置。自动添加到当前品牌子字典。"""
-    provider = config.get("current_brand_type", "broadlink")
+def add_or_update_device(device_id, info, provider=None):
+    """添加或更新设备信息，不覆盖已有配置。provider 未指定时用 current_brand_type。"""
+    if provider is None:
+        provider = config.get("current_brand_type", "broadlink")
     config.setdefault("devices", {}).setdefault(provider, {})
     existing = config["devices"][provider].get(device_id, {})
     # 已有设备不覆盖用户昵称
