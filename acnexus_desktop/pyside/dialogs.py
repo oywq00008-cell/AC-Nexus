@@ -104,7 +104,7 @@ def open_about(parent):
     layout, swl = _dialog_content(dlg, frameless=True)
 
     layout.addStretch()
-    layout.addWidget(lbl("AC-Nexus v5.3.0", bold=True, size=18), alignment=QtCore.Qt.AlignCenter)
+    layout.addWidget(lbl("AC-Nexus v5.3.1", bold=True, size=18), alignment=QtCore.Qt.AlignCenter)
     layout.addSpacing(10)
     layout.addWidget(lbl("智能空调控制系统", size=13), alignment=QtCore.Qt.AlignCenter)
     layout.addWidget(lbl("Broadlink RM + 米家 MIoT 红外遥控器", color="#666", size=11), alignment=QtCore.Qt.AlignCenter)
