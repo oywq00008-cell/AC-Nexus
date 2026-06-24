@@ -91,6 +91,6 @@ app = BUNDLE(
         'LSMinimumSystemVersion': '10.13',
         'CFBundleDisplayName': 'AC-Nexus',
         'CFBundleName': 'AC-Nexus',
-        'CFBundleShortVersionString': '5.3.0',
+        'CFBundleShortVersionString': '5.3.1',
     },
 )

@@ -4,8 +4,8 @@
 # http://msdn.microsoft.com/en-us/library/ms646997.aspx
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(5, 2, 0, 0),
-    prodvers=(5, 2, 0, 0),
+    filevers=(5, 3, 1, 0),
+    prodvers=(5, 3, 1, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -21,12 +21,12 @@ VSVersionInfo(
           [
             StringStruct(u'CompanyName', u'AC-Nexus'),
             StringStruct(u'FileDescription', u'AC-Nexus - AI Agent \u667a\u80fd\u7a7a\u8c03\u63a7\u5236\u5668'),
-            StringStruct(u'FileVersion', u'5.3.0'),
+            StringStruct(u'FileVersion', u'5.3.1'),
             StringStruct(u'InternalName', u'AC-Nexus'),
             StringStruct(u'LegalCopyright', u'MIT License \u00a9 2026 AC-Nexus'),
             StringStruct(u'OriginalFilename', u'AC-Nexus.exe'),
             StringStruct(u'ProductName', u'AC-Nexus'),
-            StringStruct(u'ProductVersion', u'5.3.0'),
+            StringStruct(u'ProductVersion', u'5.3.1'),
           ]
         ),
       ]
