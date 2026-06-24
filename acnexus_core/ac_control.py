@@ -36,21 +36,34 @@ def _subnet_broadcast(ip):
     return '255.255.255.255'
 
 
-def discover_devices(timeout=5):
-    """在主网卡上用子网广播发现博联设备。macOS 上只扫主网卡，避免虚拟网卡超时。"""
+def discover_devices(timeout=5, extra_broadcasts=None):
+    """UDP 子网广播发现博联设备。
+       先扫本机所在子网，再扫 extra_broadcasts 中的每个广播地址。
+       同一 MAC 只保留首次出现的结果。"""
     ip = _get_primary_ip()
-    broadcast = _subnet_broadcast(ip)
+    broadcasts = [_subnet_broadcast(ip)]
+    if extra_broadcasts:
+        for b in extra_broadcasts:
+            if b not in broadcasts:
+                broadcasts.append(b)
+
+    seen = set()
     all_devices = []
-    try:
-        devices = broadlink.discover(
-            timeout=timeout,
-            local_ip_address=ip,
-            discover_ip_address=broadcast,
-            discover_ip_port=80,
-        )
-        all_devices.extend(devices)
-    except Exception as e:
-        write_log("系统", f"设备扫描失败 ({ip}): {e}")
+    for broadcast in broadcasts:
+        try:
+            devices = broadlink.discover(
+                timeout=timeout,
+                local_ip_address=ip,
+                discover_ip_address=broadcast,
+                discover_ip_port=80,
+            )
+            for d in devices:
+                mac = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
+                if mac not in seen:
+                    seen.add(mac)
+                    all_devices.append(d)
+        except Exception as e:
+            write_log("系统", f"设备扫描失败 ({broadcast}): {e}")
     return all_devices
 
 

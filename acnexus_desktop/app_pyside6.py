@@ -798,8 +798,15 @@ class App(QtWidgets.QMainWindow):
         threading.Thread(target=self._do_scan_devices, args=(self._brand_type,), daemon=True).start()
 
     def _do_scan_devices(self, brand_type="broadlink"):
+        # 收集已知博联设备所在的其他子网，一并广播扫描
+        extra_broadcasts = set()
+        for mac, dev in _cfg.config.get("devices", {}).get("broadlink", {}).items():
+            host = dev.get("host", "")
+            parts = host.split(".")
+            if len(parts) == 4:
+                extra_broadcasts.add(".".join(parts[:3] + ["255"]))
         try:
-            devices = discover_devices(timeout=5)
+            devices = discover_devices(timeout=5, extra_broadcasts=sorted(extra_broadcasts))
         except Exception as e:
             write_log("系统", f"设备扫描异常: {e}")
             self._ui(lambda: self._conn_status.setText("● 未连接"))
