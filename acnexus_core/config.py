@@ -4,6 +4,7 @@
 """
 
 import json
+import threading
 from pathlib import Path
 
 # ── 路径常量 ──
@@ -51,6 +52,8 @@ DEFAULT_RULES = [
 
 config = None  # 由 init() 设置
 
+_save_lock = threading.Lock()  # 线程安全：保护 save_config 写盘
+
 
 def load_config():
     APP_DIR.mkdir(parents=True, exist_ok=True)
@@ -77,17 +80,18 @@ def load_config():
 
 def save_config(cfg, sync_device=True):
     """保存配置。sync_device=True 时先把扁平键写回当前设备"""
-    if sync_device:
-        mac = cfg.get("current_device_mac", "")
-        provider = cfg.get("current_brand_type", "broadlink")
-        if mac and mac in cfg.get("devices", {}).get(provider, {}):
-            dev = cfg["devices"][provider][mac]
-            for k in DEVICE_KEYS:
-                if k in cfg:
-                    dev[k] = cfg[k]
-    tmp = CONFIG_FILE.with_suffix('.tmp')
-    tmp.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(CONFIG_FILE)
+    with _save_lock:
+        if sync_device:
+            mac = cfg.get("current_device_mac", "")
+            provider = cfg.get("current_brand_type", "broadlink")
+            if mac and mac in cfg.get("devices", {}).get(provider, {}):
+                dev = cfg["devices"][provider][mac]
+                for k in DEVICE_KEYS:
+                    if k in cfg:
+                        dev[k] = cfg[k]
+        tmp = CONFIG_FILE.with_suffix('.tmp')
+        tmp.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(CONFIG_FILE)
 
 
 def apply_config():
@@ -386,6 +390,7 @@ def init(api_key=None, qw_host=None, location=None, brand=None):
         dev = get_current_device()
         if dev:
             dev["brand"] = brand
+            config["brand"] = brand  # 同步根级，防止 save_config sync_device 回写旧值
             changed = True
     if changed:
         save_config(config)

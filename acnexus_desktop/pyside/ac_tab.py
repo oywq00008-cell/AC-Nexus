@@ -418,6 +418,7 @@ def _schedule_card(app, grid):
 
     def _on_tmpl_switch(t):
         mac = _cfg.config.get("current_device_mac", "")
+        if not mac: return
         provider = _cfg.config.get("current_brand_type", "broadlink")
         dev = _cfg.config.setdefault("devices", {}).setdefault(provider, {}).setdefault(mac, {})
         name = dev.get("name", mac[:8] if mac else "未知")

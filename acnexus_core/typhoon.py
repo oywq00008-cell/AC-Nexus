@@ -331,27 +331,20 @@ def judge_and_shutdown(write_log_func):
         from acnexus_core.scheduler import pause_scheduler
         pause_scheduler()
         # 台风关机对所有品牌所有设备生效
-        offline_count = off_count = 0
+        # 不检查在线状态：宁可对离线设备发一次失败指令（被 try/except 兜底），也不能漏掉实际在线的设备
+        off_count = 0
         for provider, devs in _cfg.config.get("devices", {}).items():
             if not isinstance(devs, dict):
                 continue
             for mac, dev in devs.items():
                 name = dev.get("name", mac[:8])
-                # MIoT 设备不依赖局域网扫描，始终视为在线
-                if provider == "xiaomi_cloud":
-                    online = True
-                else:
-                    online = not _cfg._online_macs or mac in _cfg._online_macs
-                if not online:
-                    offline_count += 1
-                    continue
                 try:
                     send_ac("off", "cool", 26, "auto", source="台风", mac=mac)
                     write_log_func("空调", f"[{datetime.now():%H:%M}] {off_reason} → [{name}] 已自动关机")
                     off_count += 1
                 except Exception as e:
                     write_log_func("系统", f"台风关机失败 [{name}]: {e}")
-        write_log_func("系统", f"[{datetime.now():%H:%M}] 台风自动关机完成: 关闭 {off_count} 台, 离线 {offline_count} 台")
+        write_log_func("系统", f"[{datetime.now():%H:%M}] 台风自动关机完成: 关闭 {off_count} 台")
     else:
         # 开关关闭 或 风暴远离 → 恢复调度器正常运作
         from acnexus_core.scheduler import resume_scheduler

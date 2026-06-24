@@ -674,6 +674,15 @@ class App(QtWidgets.QMainWindow):
         threading.Thread(target=lambda: self._do_send(power, mode, temp, fan), daemon=True).start()
 
     def _do_send(self, power, mode, temp, fan):
+        mac = _cfg.config.get("current_device_mac", "")
+        if not mac:
+            self._ui(lambda: [self._status_label.setText("⚠️ 请先选择或添加设备"),
+                              self._status_label.setStyleSheet("color:#E67E22; font-weight:bold;")])
+            self._ui(lambda: QtCore.QTimer.singleShot(3000, lambda: (
+                self._status_label.setText("● 运行正常"),
+                self._status_label.setStyleSheet("color:#27AE60; font-weight:bold;")
+            )))
+            return
         def _restore():
             self._status_label.setText("● 运行正常")
             self._status_label.setStyleSheet("color:#27AE60; font-weight:bold;")
@@ -699,6 +708,7 @@ class App(QtWidgets.QMainWindow):
         _update_schedule_display(self)
 
     def _save_adjust(self):
+        if not _cfg.config.get("current_device_mac"): return
         _cfg.config["auto_adjust"] = self._adjust_sw.isChecked()
         save_config(_cfg.config)
         with _sched_lock: register_all_jobs()
@@ -829,21 +839,30 @@ class App(QtWidgets.QMainWindow):
         self._ui(lambda: self.statusBar().showMessage(f"✅ 发现 {count} 个设备", 4000))
 
     def _rename_device(self):
-        mac = _cfg.config.get("current_device_mac","")
+        idx = self._dev_combo.currentIndex()
+        if idx < 0: return
+        mac = self._dev_combo.itemData(idx)
         if not mac: return
-        dev = get_current_device(); old = dev.get("name",mac[:8])
+        devs = _cfg.config.get("devices",{}).get(self._brand_type, {})
+        dev = devs.get(mac, {})
+        old = dev.get("name", mac[:8])
         from .pyside.dialogs import open_rename_device
         new_name = open_rename_device(self, old, mac)
         if new_name and new_name != old:
             _cfg.config.setdefault("devices",{}).setdefault(self._brand_type,{}).setdefault(mac,{})["name"] = new_name
-            _cfg.config["name"] = new_name; save_config(_cfg.config); self._refresh_device_list()
+            _cfg.config["current_device_mac"] = mac
+            _cfg.config["name"] = new_name
+            save_config(_cfg.config)
+            self._refresh_device_list()
             write_log("系统", f"设备重命名: {old} → {new_name}")
 
     def _delete_device(self):
-        mac=_cfg.config.get("current_device_mac","")
-        devs=_cfg.config.get("devices",{}).get(self._brand_type, {})
-        if not mac or not devs:
-            return  # 无设备或未选中，静默忽略
+        idx = self._dev_combo.currentIndex()
+        if idx < 0: return
+        mac = self._dev_combo.itemData(idx)
+        if not mac: return
+        devs = _cfg.config.get("devices",{}).get(self._brand_type, {})
+        if not devs: return
         dev = devs.get(mac,{})
         name = dev.get('name', mac[:8])
         model = dev.get('model', '')
@@ -855,7 +874,6 @@ class App(QtWidgets.QMainWindow):
                 _cfg.config["current_device_mac"] = ""
             else:
                 fallback = next(iter(devs))
-                _cfg.config["current_device_mac"] = fallback
                 switch_device(fallback)
             save_config(_cfg.config)
             self._refresh_device_list(); self._refresh_device_ui(); register_all_jobs()
