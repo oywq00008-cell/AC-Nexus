@@ -80,7 +80,7 @@ def open_repair(app):
         old_dev = get_current_device()
         old_ip = old_dev.get("host") if old_dev else None
         try:
-            devices = discover_devices(timeout=5)
+            devices = discover_devices(timeout=3)
             if devices:
                 d = devices[0]; new_ip = d.host[0] if isinstance(d.host, tuple) else str(d.host)
                 ip_changed = old_ip and new_ip != old_ip

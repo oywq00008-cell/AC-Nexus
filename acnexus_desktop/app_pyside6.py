@@ -822,7 +822,7 @@ class App(QtWidgets.QMainWindow):
 
     def _do_scan_devices(self, brand_type="broadlink"):
         try:
-            devices = discover_devices(timeout=5)
+            devices = discover_devices(timeout=3)
         except Exception as e:
             write_log("系统", f"设备扫描异常: {e}")
             self._ui(lambda: self._conn_status.setText("● 未连接"))
@@ -857,7 +857,7 @@ class App(QtWidgets.QMainWindow):
                     pass
         if not online:
             write_log("系统", "设备扫描: 未发现设备")
-            _cfg._online_macs = set()
+            _cfg._online_macs = online
             self._ui(lambda: self._conn_status.setText("● 未连接"))
             self._ui(lambda: self._conn_status.setStyleSheet(
                 "QLabel { color:#E74C3C; font-weight:bold; border:1px solid #E74C3C; border-radius:7px; padding:0px 8px; font-size:12px; max-height:16px; }"))

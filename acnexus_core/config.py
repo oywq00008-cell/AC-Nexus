@@ -220,7 +220,7 @@ def _migrate_old_config():
     host = ""; port = 80; model = ""
     try:
         from acnexus_core.ac_control import discover_devices
-        devices_list = discover_devices(timeout=5)
+        devices_list = discover_devices(timeout=3)
         if devices_list:
             d = devices_list[0]
             mac = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)

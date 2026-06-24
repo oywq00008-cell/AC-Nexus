@@ -36,7 +36,7 @@ def _subnet_broadcast(ip):
     return '255.255.255.255'
 
 
-def discover_devices(timeout=5):
+def discover_devices(timeout=3):
     """在主网卡上用子网广播发现博联设备。macOS 上只扫主网卡，避免虚拟网卡超时。"""
     ip = _get_primary_ip()
     broadcast = _subnet_broadcast(ip)
@@ -74,7 +74,7 @@ def get_device(mac=None):
             pass
 
     # 回退扫描
-    all_devices = discover_devices(timeout=5)
+    all_devices = discover_devices(timeout=3)
     if not all_devices:
         raise Exception("未发现博联设备，请确认：\n"
                         "1. 电脑和博联设备在同一个局域网\n"
