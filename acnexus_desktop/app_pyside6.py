@@ -426,6 +426,20 @@ class App(QtWidgets.QMainWindow):
         self._scan_btn.clicked.connect(self._scan_devices)
         layout.addWidget(self._scan_btn, alignment=QtCore.Qt.AlignTop)
 
+        # 手动添加博联设备按钮（仅博联模式显示）
+        self._manual_add_btn = QtWidgets.QPushButton()
+        self._manual_add_btn.setIcon(QtGui.QIcon(self._icon("add_black.svg")))
+        self._manual_add_btn.setIconSize(QtCore.QSize(20, 20))
+        self._manual_add_btn.setFixedSize(26, 30)
+        self._manual_add_btn.setFlat(True)
+        self._manual_add_btn.setToolTip("手动添加设备")
+        self._manual_add_btn.setStyleSheet("""
+            QPushButton { border:none; background:transparent; }
+            QPushButton:hover { background:#E8F0FE; border-radius:4px; }
+        """)
+        self._manual_add_btn.clicked.connect(self._on_manual_add)
+        layout.addWidget(self._manual_add_btn, alignment=QtCore.Qt.AlignTop)
+
         # 米家 [+] 添加按钮（隐藏）
         self._add_xiaomi_btn = QtWidgets.QPushButton()
         self._add_xiaomi_btn.setIcon(QtGui.QIcon(self._icon("add_black.svg")))
@@ -520,6 +534,14 @@ class App(QtWidgets.QMainWindow):
             register_all_jobs()
             self.statusBar().showMessage(f"✅ 已添加 {len(dids)} 个米家设备", 4000)
 
+    def _on_manual_add(self):
+        """手动添加博联设备：弹窗输入 IP → TCP 直连获取 MAC/型号"""
+        from .pyside.dialogs import open_manual_add_device
+        open_manual_add_device(self)
+        self._refresh_device_list()
+        self._refresh_device_ui()
+        register_all_jobs()
+
     def _ensure_miot_spec(self):
         """遍历所有米家设备，为缺少 miot_spec 的后台补拉并冻结发送按钮"""
         devs = _cfg.config.get("devices", {}).get("xiaomi_cloud", {})
@@ -578,6 +600,7 @@ class App(QtWidgets.QMainWindow):
             self._brand_logo.clear()
         self._add_xiaomi_btn.setVisible(self._brand_type == "xiaomi_cloud")
         self._scan_btn.setVisible(self._brand_type == "broadlink")
+        self._manual_add_btn.setVisible(self._brand_type == "broadlink")
         self._refresh_brand_btn_style()
 
     def _refresh_brand_btn_style(self):
@@ -808,14 +831,7 @@ class App(QtWidgets.QMainWindow):
             self._ui(lambda: self.statusBar().showMessage(f"❌ 扫描异常: {e}", 4000))
             return
         if not devices:
-            write_log("系统", "设备扫描: 未发现设备")
-            _cfg._online_macs = set()
-            self._ui(lambda: self._conn_status.setText("● 未连接"))
-            self._ui(lambda: self._conn_status.setStyleSheet(
-                "QLabel { color:#E74C3C; font-weight:bold; border:1px solid #E74C3C; border-radius:7px; padding:0px 8px; font-size:12px; max-height:16px; }"))
-            self._ui(self._refresh_device_list)
-            self._ui(lambda: self.statusBar().showMessage("❌ 未发现设备", 4000))
-            return
+            devices = []  # UDP 无发现，后续靠 TCP hello 补齐
         online = set()
         for d in devices:
             mac = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
@@ -825,10 +841,32 @@ class App(QtWidgets.QMainWindow):
                 "port": d.host[1] if isinstance(d.host, tuple) and len(d.host) > 1 else 80,
                 "mac": mac, "model": d.model, "name": d.model or d.name,
             }, provider=brand_type)
-        # sync_device=False 避免 config 根级脏扁平键覆写新建设备的正确属性
+        # TCP hello 补齐：对 UDP 广播扫不到的已知设备尝试直连（跨子网场景）
+        import broadlink
+        for mac, dev in _cfg.config.get("devices", {}).get("broadlink", {}).items():
+            if mac not in online:
+                try:
+                    d = broadlink.hello(dev["host"], timeout=2)
+                    d.auth()
+                    online.add(mac)
+                    add_or_update_device(mac, {
+                        "host": dev["host"], "port": 80, "mac": mac,
+                        "model": d.model, "name": dev.get("name", d.model),
+                    }, provider=brand_type)
+                except Exception:
+                    pass
+        if not online:
+            write_log("系统", "设备扫描: 未发现设备")
+            _cfg._online_macs = set()
+            self._ui(lambda: self._conn_status.setText("● 未连接"))
+            self._ui(lambda: self._conn_status.setStyleSheet(
+                "QLabel { color:#E74C3C; font-weight:bold; border:1px solid #E74C3C; border-radius:7px; padding:0px 8px; font-size:12px; max-height:16px; }"))
+            self._ui(self._refresh_device_list)
+            self._ui(lambda: self.statusBar().showMessage("❌ 未发现设备", 4000))
+            return
         save_config(_cfg.config, sync_device=False)
         _cfg._online_macs = online
-        count = len(devices)
+        count = len(online)
         write_log("系统", f"设备扫描完成: 发现 {count} 个设备")
         self._ui(self._refresh_device_list)
         self._ui(self._refresh_device_ui)

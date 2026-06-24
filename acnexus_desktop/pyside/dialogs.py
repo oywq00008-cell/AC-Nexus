@@ -216,6 +216,58 @@ def open_delete_device(parent, name=None, allow=True):
     return result[0]
 
 
+# ── 手动添加博联设备 ──
+def open_manual_add_device(parent):
+    """输入 IP 地址，TCP 直连获取 MAC/型号，添加到博联设备列表"""
+    dlg = _make_dialog(parent, "手动添加博联设备", 400, 180, frameless=True)
+    layout, swl = _dialog_content(dlg, frameless=True)
+
+    swl.addWidget(lbl("输入博联设备的局域网 IP 地址：", size=12))
+    entry = QtWidgets.QLineEdit()
+    entry.setPlaceholderText("例: 192.168.8.214")
+    swl.addWidget(entry)
+    swl.addStretch()
+
+    status = lbl("", size=11)
+    swl.addWidget(status)
+
+    btns = QtWidgets.QWidget()
+    bl = QtWidgets.QHBoxLayout(btns)
+    bl.addStretch()
+    bl.addWidget(QtWidgets.QPushButton("取消", clicked=dlg.reject))
+
+    ok_btn = QtWidgets.QPushButton("确认添加")
+
+    def do_add():
+        ip = entry.text().strip()
+        if not ip:
+            status.setText("❌ 请输入 IP 地址"); return
+        ok_btn.setEnabled(False)
+        status.setText("⏳ 正在连接...")
+        try:
+            import broadlink
+            d = broadlink.hello(ip, timeout=3)
+            d.auth()
+            mac = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
+            model = d.model
+            from acnexus_core.config import add_or_update_device, save_config
+            add_or_update_device(mac, {
+                "host": ip, "port": 80, "mac": mac, "model": model, "name": model,
+            })
+            save_config(_cfg.config, sync_device=False)
+            status.setText(f"✅ 已添加 {model}")
+            # 添加成功后 1 秒自动关闭
+            QtCore.QTimer.singleShot(1000, dlg.accept)
+        except Exception as e:
+            status.setText(f"❌ 未发现设备: {e}")
+            ok_btn.setEnabled(True)
+
+    ok_btn.clicked.connect(do_add)
+    bl.addWidget(ok_btn)
+    layout.addWidget(btns)
+    dlg.exec()
+
+
 # ── 定时模板编辑（已拆分至 schedule_dialog.py）──
 from .schedule_dialog import _schedule_summary, open_schedule_template  # noqa: F401
 
