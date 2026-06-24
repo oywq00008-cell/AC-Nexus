@@ -805,15 +805,36 @@ class App(QtWidgets.QMainWindow):
             parts = host.split(".")
             if len(parts) == 4:
                 extra_broadcasts.add(".".join(parts[:3] + ["255"]))
-        try:
-            devices = discover_devices(timeout=5, extra_broadcasts=sorted(extra_broadcasts))
-        except Exception as e:
-            write_log("系统", f"设备扫描异常: {e}")
-            self._ui(lambda: self._conn_status.setText("● 未连接"))
-            self._ui(lambda: self._conn_status.setStyleSheet(
-                "QLabel { color:#E74C3C; font-weight:bold; border:1px solid #E74C3C; border-radius:7px; padding:0px 8px; font-size:12px; max-height:16px; }"))
-            self._ui(lambda: self.statusBar().showMessage(f"❌ 扫描异常: {e}", 4000))
-            return
+
+        if IS_MAC:
+            # macOS: 枚举所有 192.168.x.x 网卡发起广播，避免绑到虚拟网卡（utun/vmnet 等）
+            import netifaces
+            seen = set()
+            devices = []
+            for iface in netifaces.interfaces():
+                for addr in netifaces.ifaddresses(iface).get(netifaces.AF_INET, []):
+                    ip = addr.get("addr", "")
+                    if not ip.startswith("192.168."):
+                        continue
+                    try:
+                        found = discover_devices(timeout=5, extra_broadcasts=sorted(extra_broadcasts), local_ip=ip)
+                        for d in found:
+                            mac = d.mac.hex() if isinstance(d.mac, bytes) else str(d.mac)
+                            if mac not in seen:
+                                seen.add(mac)
+                                devices.append(d)
+                    except Exception:
+                        pass
+        else:
+            try:
+                devices = discover_devices(timeout=5, extra_broadcasts=sorted(extra_broadcasts))
+            except Exception as e:
+                write_log("系统", f"设备扫描异常: {e}")
+                self._ui(lambda: self._conn_status.setText("● 未连接"))
+                self._ui(lambda: self._conn_status.setStyleSheet(
+                    "QLabel { color:#E74C3C; font-weight:bold; border:1px solid #E74C3C; border-radius:7px; padding:0px 8px; font-size:12px; max-height:16px; }"))
+                self._ui(lambda: self.statusBar().showMessage(f"❌ 扫描异常: {e}", 4000))
+                return
         if not devices:
             write_log("系统", "设备扫描: 未发现设备")
             _cfg._online_macs = set()

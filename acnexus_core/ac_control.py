@@ -36,12 +36,14 @@ def _subnet_broadcast(ip):
     return '255.255.255.255'
 
 
-def discover_devices(timeout=5, extra_broadcasts=None):
+def discover_devices(timeout=5, extra_broadcasts=None, local_ip=None):
     """UDP 子网广播发现博联设备。
        先扫本机所在子网，再扫 extra_broadcasts 中的每个广播地址。
+       local_ip: 指定绑定的本地 IP，不传则自动检测主网卡。
        同一 MAC 只保留首次出现的结果。"""
-    ip = _get_primary_ip()
-    broadcasts = [_subnet_broadcast(ip)]
+    if local_ip is None:
+        local_ip = _get_primary_ip()
+    broadcasts = [_subnet_broadcast(local_ip)]
     if extra_broadcasts:
         for b in extra_broadcasts:
             if b not in broadcasts:
@@ -53,7 +55,7 @@ def discover_devices(timeout=5, extra_broadcasts=None):
         try:
             devices = broadlink.discover(
                 timeout=timeout,
-                local_ip_address=ip,
+                local_ip_address=local_ip,
                 discover_ip_address=broadcast,
                 discover_ip_port=80,
             )
