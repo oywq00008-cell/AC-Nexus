@@ -103,6 +103,10 @@ acnexus_desktop/          # PySide6 桌面
 └── pyside/                   # UI 模块
 protocols/                    # 自研红外协议
 ```
+## 📁 OpenWRT 路由器版本
+
+[AC-Nexus-OpenWRT](https://github.com/oywq00008-cell/AC-Nexus-OpenWRT)
+专为 OpenWRT 路由器重写的 AC-Nexus 版本，拥有原版全部重要功能并保持极致轻量化，专为低性能路由器重新设计代码！
 
 ## 🔐 隐私
 
