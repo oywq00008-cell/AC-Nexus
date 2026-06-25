@@ -103,6 +103,10 @@ acnexus_desktop/          # PySide6 desktop
 └── pyside/                   # UI modules
 protocols/                    # Custom IR protocols
 ```
+## 📁 OpenWRT Router Version
+
+[AC-Nexus-OpenWRT](https://github.com/oywq00008-cell/AC-Nexus-OpenWRT)
+An AC-Nexus version rewritten specifically for OpenWrt routers; it retains all key features of the original while remaining extremely lightweight, with code redesigned for low-performance routers.
 
 ## 🔐 Privacy
 
