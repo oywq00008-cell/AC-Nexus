@@ -67,7 +67,7 @@ def get_raw_code(name, power, mode, temp, fan):
             return codes["关机"]
         return None
 
-    mode_map = {"cool": "制冷", "heat": "制热", "fan_only": "送风", "dry": "除湿", "auto": "自动"}
+    mode_map = {"cool": "制冷", "heat": "制热", "fan": "送风", "dry": "除湿", "auto": "自动"}
     fan_map = {"auto": "自动", "1": "低", "2": "中", "3": "高"}
     mode_ch = mode_map.get(mode, "制冷")
     fan_ch = fan_map.get(str(fan), "自动")

@@ -9,7 +9,7 @@ _MODE  = (3, 2)
 _TEMP  = (3, 4)
 _FAN   = (4, 2)
 
-_MODES = {"cool": 0, "dry": 4, "fan": 3, "auto": 2}
+_MODES = {"cool": 0, "heat": 1, "dry": 4, "fan": 3, "auto": 2}
 _FANS  = {"auto": 0, "1": 1, "2": 2, "3": 3}
 
 
