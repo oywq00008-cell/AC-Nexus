@@ -25,8 +25,11 @@ def pause_scheduler():
 
 
 def resume_scheduler():
-    """台风远离/用户关开关时恢复调度器：取消暂停 + 唤醒线程"""
+    """台风远离/用户关开关时恢复调度器：取消暂停 + 唤醒线程。
+    守卫：仅在确实被暂停过时才恢复，防止无条件唤醒导致调度器被迫重建。"""
     global _sched_paused
+    if not _sched_paused:
+        return
     _sched_paused = False
     _sched_event.set()
 
