@@ -1,4 +1,4 @@
-# 🌀 AC-Nexus v5.3.1
+# 🌀 AC-Nexus v5.3.2
 
 [中文](README.md) | English
 

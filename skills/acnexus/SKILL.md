@@ -1,11 +1,11 @@
 ---
 name: AC-Nexus
-version: 5.3.1
+version: 5.3.2
 identifier: oywq00008-cell-AC-Nexus-for-agent-skill
 description: 🎮 AI Agent 智能空调控制核心库 — 零 GUI 依赖，import 即用。支持 17 大品牌空调（格力/美的/海尔/大金等），直连 Broadlink RM 红外遥控器，同时接入所有支持 MIoT 协议的米家红外遥控器。MIoT spec 自动匹配 siid/piid，百度+和风双天气源，中央气象台+NHC 双风暴源，多日期组定时模板，Markdown 日志，故障诊断。适配树莓派/NAS/OpenWRT/桌面全平台。（原名 BroadlinkAC，现已更名为 AC-Nexus，正式成为空调中枢）
 ---
 
-# AC-Nexus — AI Agent Smart AC Controller v5.3.1
+# AC-Nexus — AI Agent Smart AC Controller v5.3.2
 
 Cross-platform AC control library for Broadlink RM series IR blasters and Xiaomi MIoT-compatible IR remote controllers. **Zero GUI dependency** — designed for AI agents to clone, install, and control air conditioners programmatically. Device-specific MIoT siid/piid auto-matched from miot-spec.org with 7-day local cache.
 
