@@ -2,6 +2,20 @@
 
 [中文](README.md) | English
 
+**AC-Nexus is a smart AC control hub that runs on your computer.** With a single PC (Windows / macOS / Linux) you can centrally manage the air conditioners in your home or office, bringing Broadlink, Xiaomi and other IR remotes into one unified interface.
+
+It supports two types of IR-controlled devices:
+
+- **Broadlink RM series** (RM4 mini / RM Pro, etc.)
+- **Xiaomi MIoT** IR remotes (Air Conditioner Companion / universal remote)
+
+**What can it do?**
+- 🖱️ Manual control: power, mode, temperature and fan speed at your fingertips
+- 🌡️ Auto temperature: adjusts automatically by outdoor temperature — cool in summer, warm in winter, hands-free
+- ⏰ Scheduling: multiple date templates for weekdays / weekends
+- 🌪️ Storm protection: auto-shutdown to protect the outdoor unit when a typhoon approaches (exclusive feature)
+- 🌐 Cross-platform & open source: runs on all platforms, free under the MIT license
+
 **The world's first AC controller with intelligent storm safety protection.** Real-time wind speed + distance analysis intelligently determines whether to shut down ACs to protect outdoor units — stronger storms trigger protection at greater distances, while tropical depressions are automatically excluded to prevent false shutdowns. A feature no other smart home platform offers.
 
 Broadlink + Xiaomi MIoT dual-ecosystem support, Xiaomi's massive code library + built-in **17 common AC brand IR protocols**, plus **IR learning** for any unsupported brand. AI Agents control AC with one line of Python via `import acnexus_core`. Desktop app runs on all platforms — download and go, with a complete user guide that ensures even beginners can get started quickly.
