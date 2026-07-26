@@ -79,7 +79,7 @@ def scheduled_off_job(mac):
         write_log("系统", f"⏰ [{name}] 定时关机 → 设备离线，跳过")
         return None
     # 检测空调状态：未知或已关则跳过
-    state = get_last_ac_state()
+    state = get_last_ac_state(mac)
     if state["power"] == "unknown":
         write_log("系统", f"⏰ [{name}] 定时关机 → 无法判定空调状态，跳过")
         return None
@@ -96,17 +96,16 @@ def scheduled_off_job(mac):
 
 
 def auto_adjust_job(mac):
-    """每2小时自动调温：读日志判状态 → 跑规则 → 温度无变化则跳过"""
+    """每2小时自动调温：读日志判状态 → 跑规则 → 温度无变化则跳过。
+    自动调温自己关的空调，升温后需要能重新开机（state['source']=='auto' 时复开）。"""
     provider, dev = _cfg.find_device(mac)
     name = dev.get("name", mac[:8])
     if not _device_online(mac):
         write_log("系统", f"🔄 [{name}] 自动调温 → 设备离线，跳过")
         return
-    state = get_last_ac_state()
+    state = get_last_ac_state(mac)
     if state["power"] == "unknown":
         write_log("系统", f"🔄 [{name}] 自动调温 → 无法判定空调状态，跳过")
-        return
-    if state["power"] == "off":
         return
 
     if _cfg._cached_temp is None:
@@ -120,13 +119,19 @@ def auto_adjust_job(mac):
 
     target, mode = decide_ac(outdoor, mac)
     if mode == "off":
-        write_log("空调", send_ac("off", "cool", 26, "auto", source="自动", mac=mac))
+        # 规则要求关机：仅当当前开着时才发关机指令
+        if state["power"] == "on":
+            write_log("空调", send_ac("off", "cool", 26, "auto", source="自动", mac=mac))
         return
 
-    if state["mode"] == mode and state["temp"] == target:
+    # 规则要求开机（或保持）
+    if state["power"] == "on" and state["mode"] == mode and state["temp"] == target:
         write_log("空调", f"[{datetime.now():%H:%M}] [{name}] 自动调温 → 不更改温度")
         return
-
+    # 当前关着且非自动调温所关（手动/定时关机）→ 尊重，不自动开机
+    if state["power"] == "off" and state.get("source") != "auto":
+        return
+    # 其余：开着但参数变了 / 或自动调温自己关的 → 发送开机
     try:
         write_log("空调", send_ac("on", mode, target, "auto", source="自动", mac=mac))
     except Exception as e:

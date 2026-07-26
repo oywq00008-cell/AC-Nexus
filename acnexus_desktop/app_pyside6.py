@@ -1066,11 +1066,11 @@ def main():
             QtGui.QFontDatabase.addApplicationFont(str(fp))
     apply_theme()
     win = App()
+    apply_theme()  # 在 show 之前上齐样式：首帧即成品 UI，消除未渲染闪动
     if "--tray" in sys.argv:
         win.hide()  # 静默启动到托盘
     else:
         win.show()
-    apply_theme()  # 第二次调用：刷新已创建的 widgets（central_bg 等）
     sys.exit(app.exec())
 
 if __name__ == "__main__":

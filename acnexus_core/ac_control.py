@@ -102,6 +102,8 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
         dev = _cfg.config.get("devices", {}).get(provider, {}).get(mac, {})
     else:
         provider, dev = _cfg.find_device(mac)
+    name = dev.get("name", mac[:8] if mac else "未知设备")
+    dev_tag = f"[{name}] [{mac}] "
     raw_brand = dev.get("brand", "格力")
     brand = _cfg.resolve_brand(raw_brand)
     t = min(max(temp, 16), 30)
@@ -119,8 +121,8 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
         now = datetime.now()
         label = {"手动": "手动", "定时": "定时", "自动": "自动调温"}.get(source, source)
         if power == "on":
-            return f"[{now:%H:%M}] {label}开机 → {MODE_KEYS.get(mode, mode)} {temp}°C"
-        return f"[{now:%H:%M}] {label}关机"
+            return f"[{now:%H:%M}] {dev_tag}{label}开机 → {MODE_KEYS.get(mode, mode)} {temp}°C"
+        return f"[{now:%H:%M}] {dev_tag}{label}关机"
 
     # ── 自定义品牌：用 ir_learner 生成 raw hex 发送 ──
     if raw_brand != "格力" and raw_brand not in _cfg.AC_BRANDS:
@@ -130,7 +132,8 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
             d = get_device(mac)
             d.send_data(bytes.fromhex(raw_hex))
             now = datetime.now()
-            return f"[{now:%H:%M}] {'开机' if power == 'on' else '关机'} → {raw_brand} ({mode} {t}°C)"
+            label = {"手动": "手动", "定时": "定时", "自动": "自动调温"}.get(source, source)
+            return f"[{now:%H:%M}] {dev_tag}{label}{'开机' if power == 'on' else '关机'} → {raw_brand} ({mode} {t}°C)"
         return f"[{datetime.now():%H:%M}] 自定义品牌 '{raw_brand}' 中未找到匹配码"
 
     # 优先 hvac_ir（标准化 API），回退自定义 protocols
@@ -178,12 +181,8 @@ def send_ac(power: str, mode: str, temp: int, fan: str, source="手动", mac=Non
     now = datetime.now()
     label = {"手动": "手动", "定时": "定时", "自动": "自动调温"}.get(source, source)
     if power == "on":
-        if source == "自动":
-            return f"[{now:%H:%M}] 自动调温 → {MODE_KEYS.get(mode, mode)} {temp}°C"
-        return f"[{now:%H:%M}] {label}开机 → {MODE_KEYS.get(mode, mode)} {temp}°C"
-    if source == "自动":
-        return f"[{now:%H:%M}] 自动关机"
-    return f"[{now:%H:%M}] {label}关机"
+        return f"[{now:%H:%M}] {dev_tag}{label}开机 → {MODE_KEYS.get(mode, mode)} {temp}°C"
+    return f"[{now:%H:%M}] {dev_tag}{label}关机"
 
 
 def decide_ac(outdoor, mac=None):
